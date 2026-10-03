@@ -62,7 +62,7 @@ svg.ic{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.7;str
 .btn-solid{background:var(--fg);color:var(--bg)}
 .btn-line{border:1.5px solid var(--line)}
 .qrow button:disabled{opacity:.3}
-.qprev{font-size:12px;color:var(--muted);min-height:18px;padding-left:14px}
+.qprev{font-size:12px;color:var(--muted);height:18px;line-height:18px;padding-left:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .qprev b{color:var(--fg)}
 
 /* 分類タイル */
@@ -185,7 +185,6 @@ h2{font-size:13px;letter-spacing:.18em;margin:20px 0 4px;padding-bottom:4px;bord
       <div class="qrow">
         <input id="q" type="text" enterkeyhint="done" placeholder="セブン おにぎり 150" aria-label="ひとこと入力">
         <button type="submit" class="btn-solid" id="qGo" disabled>記入</button>
-        <button type="button" class="btn-line" id="qMore" disabled>詳しく</button>
       </div>
       <div class="qprev" id="qprev"></div>
     </form>
@@ -624,9 +623,9 @@ function jumpTo(d){const p=periodOf(new Date(d+"T12:00"));if(p.y!==P.y||p.m!==P.
 let qp=null;
 function qPreview(){
   const v=$("q").value.trim();
-  if(!v){qp=null;$("qGo").disabled=$("qMore").disabled=true;$("qprev").innerHTML="「昨日」「10/1」で日付、「1.2k」「6万」で金額も指定できます";return}
+  if(!v){qp=null;$("qGo").disabled=true;$("qprev").innerHTML="「昨日」「10/1」で日付も指定できます";return}
   qp=parse(v);qp.c=guess(qp.t,kind);qp.k=kind;const dt=new Date(qp.d+"T12:00");
-  $("qGo").disabled=!qp.a;$("qMore").disabled=false;
+  $("qGo").disabled=!qp.a;
   $("qprev").innerHTML=`<b>${dt.getMonth()+1}/${dt.getDate()}</b> ・ <b>${esc(qp.c)}</b>（${kind==="out"?"支出":"収入"}） ・ <b class="num">${qp.a?yen(qp.a)+"円":"金額？"}</b>`;
 }
 $("q").addEventListener("input",qPreview);
@@ -636,7 +635,6 @@ $("quick").addEventListener("submit",async e=>{
   $("q").value="";qPreview();
   try{await store.put(keyOfDate(entry.d),entry);toast(`${entry.c} ${yen(entry.a)}円 を記入`);jumpTo(entry.d)}catch(err){}
 });
-$("qMore").onclick=()=>{if(!qp)return;openSheet({k:qp.k,c:qp.c,d:qp.d,a:qp.a||"",t:qp.t});$("q").value="";qPreview()};
 
 /* ---------- 画面の操作 ---------- */
 $("kindSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;kind=b.dataset.k;render()});
@@ -702,7 +700,7 @@ render();
   runRecurring();
 })();
 /* ---------- 更新の確認 ---------- */
-const APP_VER="2026.10.03-2";$("appVer").textContent=APP_VER;
+const APP_VER="2026.10.03-3";$("appVer").textContent=APP_VER;
 async function checkUpdate(manual){
   try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const v=(await r.json()).v;
     if(v&&v!==APP_VER){$("upd").hidden=false}else if(manual)toast("最新の版です")}
