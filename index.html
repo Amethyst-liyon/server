@@ -157,6 +157,8 @@ h2{font-size:13px;letter-spacing:.18em;margin:20px 0 4px;padding-bottom:4px;bord
 .acts .save{flex:1;padding:12px;border-radius:999px;font-weight:700;letter-spacing:.15em}
 .acts .del{padding:0 16px;border-radius:999px;border:1.5px solid var(--warn);color:var(--warn)}
 .acts .del.sure{background:var(--warn);color:var(--bg)}
+.upd{position:fixed;left:16px;right:16px;top:calc(8px + env(safe-area-inset-top,0px));max-width:528px;margin:0 auto;background:var(--fg);color:var(--bg);border-radius:12px;padding:10px 12px 10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;z-index:30;font-size:14px}
+.upd button{background:var(--bg);color:var(--fg);border-radius:999px;padding:6px 14px;font-weight:700}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:6px 16px;border-radius:999px;font-size:13px;z-index:20;white-space:nowrap}
 @media (prefers-reduced-motion:no-preference){.gauge i{transition:width .4s ease}}
 </style>
@@ -231,7 +233,7 @@ h2{font-size:13px;letter-spacing:.18em;margin:20px 0 4px;padding-bottom:4px;bord
     <div id="catsOut"></div>
     <h2><span>収入の分類</span></h2>
     <div id="catsIn"></div>
-    <p class="note">アイコンをタップすると絵柄が変わります。分類を消すと、その分類の明細もすべて消えます。<br><span id="storeNote"></span></p>
+    <p class="note">アイコンをタップすると絵柄が変わります。分類を消すと、その分類の明細もすべて消えます。<br><span id="storeNote"></span><br>アプリの版：<span id="appVer" class="num"></span> <button id="updCheck" class="btn-line" style="padding:2px 10px;border-radius:999px;font-size:12px">更新を確認</button></p>
   </main>
 </div>
 
@@ -257,6 +259,7 @@ h2{font-size:13px;letter-spacing:.18em;margin:20px 0 4px;padding-bottom:4px;bord
   </form>
 </div>
 <div class="toast" id="toast" hidden></div>
+<div class="upd" id="upd" hidden role="status"><span>新しい版があります</span><button id="updGo">更新する</button></div>
 
 <script>
 /* ---------- 絵柄 ---------- */
@@ -698,6 +701,18 @@ render();
   P=periodOf(now);subscribe();
   runRecurring();
 })();
+/* ---------- 更新の確認 ---------- */
+const APP_VER="2026.10.03-2";$("appVer").textContent=APP_VER;
+async function checkUpdate(manual){
+  try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const v=(await r.json()).v;
+    if(v&&v!==APP_VER){$("upd").hidden=false}else if(manual)toast("最新の版です")}
+  catch(e){if(manual)toast("ネットにつながっていないため確認できません")}
+}
+$("updGo").onclick=async()=>{$("updGo").textContent="更新中…";try{const reg=await navigator.serviceWorker.getRegistration();if(reg)await reg.update()}catch(e){}location.reload()};
+$("updCheck").onclick=()=>checkUpdate(true);
+let lastCheck=0;const autoCheck=()=>{if(Date.now()-lastCheck>60000){lastCheck=Date.now();checkUpdate(false)}};
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")autoCheck()});
+setTimeout(autoCheck,1500);
 if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
 </script>
 </body>
