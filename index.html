@@ -700,7 +700,7 @@ render();
   runRecurring();
 })();
 /* ---------- 更新の確認 ---------- */
-const APP_VER="2026.10.03-3";$("appVer").textContent=APP_VER;
+const APP_VER="2026.10.03-4";$("appVer").textContent=APP_VER;
 async function checkUpdate(manual){
   try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const v=(await r.json()).v;
     if(v&&v!==APP_VER){$("upd").hidden=false}else if(manual)toast("最新の版です")}
@@ -711,7 +711,7 @@ $("updCheck").onclick=()=>checkUpdate(true);
 let lastCheck=0;const autoCheck=()=>{if(Date.now()-lastCheck>60000){lastCheck=Date.now();checkUpdate(false)}};
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")autoCheck()});
 setTimeout(autoCheck,1500);
-if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js").catch(()=>{}));
+if("serviceWorker" in navigator)window.addEventListener("load",()=>navigator.serviceWorker.register("sw.js",{updateViaCache:"none"}).catch(()=>{}));
 </script>
 </body>
 </html>
