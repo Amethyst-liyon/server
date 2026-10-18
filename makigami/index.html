@@ -161,9 +161,8 @@ ol.steps{margin:0;padding-left:1.3em;font-size:12.5px;line-height:1.8;color:var(
 
   <section class="pane" data-pane="claude" hidden>
     <h3>Claudeの下書き</h3>
-    <p class="note">Claude に「巻紙の〈作品名〉の下書きに書いて」と頼むと、ドライブの <code>下書き_Claude.md</code> に書き込まれます。同期するとここに届きます。本文には自動で入らないので、使うときだけ取り込んでください。</p>
-    <div class="draft empty" id="draftBox">まだ下書きはありません。</div>
-    <div class="btns"><button class="btn" id="draftAppend" type="button">今の章の最後に足す</button><button class="btn ghost" id="draftNew" type="button">新しい章にする</button></div>
+    <p class="note">Claude に「巻紙の〈作品名〉に下書きを書いて」と頼むと、作品のフォルダに <code>下書き_Claude_日時.md</code> が置かれます。同期するとここに届きます。本文には自動で入らないので、使うものだけ取り込んでください。いらなくなった下書きはドライブから消せます。</p>
+    <div id="draftList" class="field"></div>
     <h3>Claudeが読めるもの</h3>
     <p class="note">ドライブの「執筆」フォルダにある章ファイル（1章1ファイル）と設定.md。アイデア出しを頼むときは作品名を伝えると読みに行けます。</p>
   </section>
@@ -211,6 +210,7 @@ function load(){
     const w=sampleWork(); S={works:[w],cur:w.id,clientId:'',rootId:'',day:null,connected:false,lastSync:0,trashFolders:[],pos:{}};
   }
   S.trashFolders=S.trashFolders||[]; S.pos=S.pos||{};
+  S.works.forEach(w=>{w.draft.items=w.draft.items||[]});
 }
 let saveT;
 function save(){clearTimeout(saveT);saveT=setTimeout(saveNow,400)}
@@ -357,7 +357,7 @@ function updateStats(){
 function openDrawer(tab){if(editing)editing.ta.blur();if(tab)selTab(tab);renderDrawer();document.body.classList.add('open')}
 function closeDrawer(){document.body.classList.remove('open')}
 function selTab(t){$$('.tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));$$('.pane').forEach(p=>p.hidden=p.dataset.pane!==t);
-  if(t==='claude'){W().draft.unread=false;save();dots()}}
+  if(t==='claude'){const d=W().draft;d.unread=false;d.items.forEach(x=>x.unread=false);save();dots()}}
 $$('.tabs button').forEach(b=>b.onclick=()=>{selTab(b.dataset.tab);renderDrawer()});
 $('#drawerBtn').onclick=()=>openDrawer();
 $('#workBtn').onclick=()=>openDrawer('work');
@@ -390,7 +390,17 @@ function renderDrawer(){
   S.works.forEach(x=>{const b=el('button','w');b.type='button';b.textContent=(x.title||'無題')+'　'+fmt(x.chapters.reduce((a,c)=>a+count(c.text),0))+'字';
     b.setAttribute('aria-current',String(x.id===w.id));b.onclick=()=>{S.cur=x.id;save();render();closeDrawer()};wl.append(b)});
   if(document.activeElement!==$('#memo'))$('#memo').value=w.memo.text;
-  const db=$('#draftBox');if(w.draft.text.trim()){db.textContent=w.draft.text;db.classList.remove('empty')}else{db.textContent=S.connected?'まだ下書きはありません。':'ドライブ同期をつなぐと、Claude からの下書きがここに届きます。';db.classList.add('empty')}
+  const dl=$('#draftList');dl.innerHTML='';
+  const items=w.draft.items.filter(x=>x.text&&x.text.trim());
+  if(!items.length){const p=el('div','draft empty');p.textContent=S.connected?'まだ下書きはありません。':'ドライブ同期をつなぐと、Claude からの下書きがここに届きます。';dl.append(p)}
+  items.forEach(it=>{
+    const h=el('h3');h.textContent=new Date(it.time).toLocaleString('ja-JP',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})+(it.done?'　取り込み済み':'');
+    const box=el('div','draft');box.textContent=it.text;
+    const bs=el('div','btns');
+    const a=el('button','btn');a.type='button';a.textContent='今の章の最後に足す';a.onclick=()=>importDraft(it,false);
+    const n=el('button','btn ghost');n.type='button';n.textContent='新しい章にする';n.onclick=()=>importDraft(it,true);
+    bs.append(a,n);dl.append(h,box,bs);
+  });
   $('#clientId').value=S.clientId||'';
   $('#originHint').textContent=location.origin;
   $('#syncInfo').textContent=S.connected?(S.lastSync?'最後の同期：'+new Date(S.lastSync).toLocaleString('ja-JP'):'つながっています。'):'まだつながっていません。';
@@ -407,18 +417,21 @@ $('#exportBtn').onclick=()=>{
   const w=W();const txt=(w.title||'無題')+'\n\n'+w.chapters.map(c=>(c.title||'')+'\n\n'+c.text).join('\n\n\n');
   const a=el('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));a.download=(w.title||'無題')+'.txt';document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)};
 function curChapter(){const w=W();return w.chapters.find(c=>c.id===curChap)||w.chapters[w.chapters.length-1]}
-$('#draftAppend').onclick=()=>{const w=W(),t=w.draft.text.trim();if(!t)return toast('取り込める下書きがありません');
-  let c=curChapter();if(!c){c=newChapter('第一章','');w.chapters.push(c)}
-  c.text=c.text?c.text.replace(/\n*$/,'')+'\n'+t:t;c.dirty=true;c.rev++;w.draft.unread=false;save();render();closeDrawer();scheduleSync();toast(`「${c.title}」の最後に足しました`)};
-$('#draftNew').onclick=()=>{const w=W(),t=w.draft.text.trim();if(!t)return toast('取り込める下書きがありません');
-  const c=newChapter('Claudeの下書き',t);const at=w.chapters.indexOf(curChapter())+1;w.chapters.splice(at,0,c);w.draft.unread=false;save();render();closeDrawer();scheduleSync();toast('新しい章として取り込みました')};
+function importDraft(it,asNew){
+  const w=W(),t=it.text.trim();if(!t)return;
+  if(asNew){const c=newChapter('Claudeの下書き',t);w.chapters.splice(w.chapters.indexOf(curChapter())+1,0,c);toast('新しい章として取り込みました')}
+  else{let c=curChapter();if(!c){c=newChapter('第一章','');w.chapters.push(c)}
+    c.text=c.text?c.text.replace(/\n*$/,'')+'\n'+t:t;c.dirty=true;c.rev++;toast(`「${c.title}」の最後に足しました`)}
+  it.done=true;it.unread=false;save();render();closeDrawer();scheduleSync();
+}
 $('#clientId').onchange=e=>{const v=e.target.value.trim();if(v!==S.clientId){S.clientId=v;token=null;tokenExp=0;sessionStorage.removeItem('mkgTok');save();syncLabel()}};
 $('#connectBtn').onclick=()=>{S.clientId=$('#clientId').value.trim();save();sync(true)};
 
 /* ---------- Googleドライブ同期 ---------- */
-const D='https://www.googleapis.com/drive/v3/files',U='https://www.googleapis.com/upload/drive/v3/files',F='id,name,modifiedTime,appProperties,trashed';
+const D='https://www.googleapis.com/drive/v3/files',U='https://www.googleapis.com/upload/drive/v3/files',F='id,name,modifiedTime,createdTime,mimeType,appProperties,trashed';
+const SCOPES='https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/drive.readonly',SCOPE_VER=2,README_VER=2;
 let token=null,tokenExp=0,syncing=false,again=false,syncT,syncErr='';
-try{const t=JSON.parse(sessionStorage.getItem('mkgTok'));if(t&&t.exp>Date.now()){token=t.t;tokenExp=t.exp}}catch(e){}
+try{const t=JSON.parse(sessionStorage.getItem('mkgTok'));if(t&&t.exp>Date.now()&&t.v===SCOPE_VER){token=t.t;tokenExp=t.exp}}catch(e){}
 const hasToken=()=>token&&Date.now()<tokenExp-60000;
 function getToken(interactive){
   return new Promise((res,rej)=>{
@@ -426,11 +439,11 @@ function getToken(interactive){
     if(!S.clientId)return rej(new Error('noclient'));
     if(!interactive)return rej(new Error('needtap'));
     if(!(window.google&&google.accounts&&google.accounts.oauth2))return rej(new Error('nogis'));
-    const c=google.accounts.oauth2.initTokenClient({client_id:S.clientId,scope:'https://www.googleapis.com/auth/drive.file',
+    const c=google.accounts.oauth2.initTokenClient({client_id:S.clientId,scope:SCOPES,
       callback:r=>{if(r.error)return rej(new Error(r.error));token=r.access_token;tokenExp=Date.now()+r.expires_in*1000;
-        try{sessionStorage.setItem('mkgTok',JSON.stringify({t:token,exp:tokenExp}))}catch(e){}S.connected=true;saveNow();res(token)},
+        try{sessionStorage.setItem('mkgTok',JSON.stringify({t:token,exp:tokenExp,v:SCOPE_VER}))}catch(e){}S.connected=true;S.scopeVer=SCOPE_VER;saveNow();res(token)},
       error_callback:e=>rej(new Error(e&&e.type||'popup'))});
-    c.requestAccessToken({prompt:S.connected?'':'consent'});
+    c.requestAccessToken({prompt:(S.connected&&S.scopeVer===SCOPE_VER)?'':'consent'});
   });
 }
 async function api(url,opt={},raw){
@@ -445,7 +458,7 @@ const createFile=(meta,text)=>{const m=mp({mimeType:'text/markdown',...meta},tex
 const updateFile=(id,meta,text)=>{const m=mp(meta,text);return api(U+'/'+id+'?uploadType=multipart&fields='+F,{method:'PATCH',...m})};
 const patchMeta=(id,meta)=>api(D+'/'+id+'?fields='+F,{method:'PATCH',body:JSON.stringify(meta),headers:{'Content-Type':'application/json'}});
 const mkFolder=(name,parent,props)=>api(D+'?fields='+F,{method:'POST',body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',...(parent?{parents:[parent]}:{}),appProperties:props}),headers:{'Content-Type':'application/json'}});
-const download=id=>api(D+'/'+id+'?alt=media',{},true);
+const download=(id,mime)=>mime==='application/vnd.google-apps.document'?api(D+'/'+id+'/export?mimeType=text%2Fplain',{},true).then(t=>t.replace(/^﻿/,'').replace(/\r\n/g,'\n')):api(D+'/'+id+'?alt=media',{},true);
 const safe=s=>(s||'無題の章').replace(/[\\/:*?"<>|\n]/g,'・').slice(0,60);
 const fileName=(i,t)=>String(i+1).padStart(2,'0')+'_'+safe(t)+'.md';
 const titleFrom=n=>n.replace(/^\d+_/,'').replace(/\.md$/,'');
@@ -456,7 +469,8 @@ const README=`# 巻紙の原稿フォルダ
 - 作品ごとにフォルダがあり、章ごとに「01_章名.md」のようなファイルが入っています（番号が章の順番）
 - 本文はふつうの文章です。ルビは ｜漢字《かんじ》、傍点は 《《言葉》》 と書きます
 - 「設定.md」は作品の設定メモです（種族・地名・出来事など）
-- 「下書き_Claude.md」は Claude が書くための場所です。頼まれた文章はこのファイルの中身を書き換えて入れてください。本文の章ファイルは直接書き換えないでください
+- Claude が文章を頼まれたときは、その作品のフォルダに新しいファイル「下書き_Claude_YYYYMMDD-HHMM.md」を作って入れてください（text/markdown、Googleドキュメントに変換しない）。中身は本文だけにします
+- 本文の章ファイルは直接書き換えないでください。アプリ側で取り込むかどうかを選びます
 `;
 
 async function ensureRoot(){
@@ -464,7 +478,13 @@ async function ensureRoot(){
   const fs=await list(`mimeType='application/vnd.google-apps.folder' and appProperties has { key='kind' and value='makigamiRoot' } and trashed=false`);
   if(fs[0]){S.rootId=fs[0].id;return}
   S.rootId=(await mkFolder('執筆',null,{kind:'makigamiRoot'})).id;
-  await createFile({name:'巻紙について.md',parents:[S.rootId],appProperties:{kind:'makigamiReadme'}},README);
+  await createFile({name:'巻紙について.md',parents:[S.rootId],appProperties:{kind:'makigamiReadme'}},README);S.readmeVer=README_VER;
+}
+async function ensureReadme(){
+  if(S.readmeVer===README_VER)return;
+  const r=(await list(`'${S.rootId}' in parents and appProperties has { key='kind' and value='makigamiReadme' } and trashed=false`))[0];
+  if(r)await updateFile(r.id,{},README);else await createFile({name:'巻紙について.md',parents:[S.rootId],appProperties:{kind:'makigamiReadme'}},README);
+  S.readmeVer=README_VER;
 }
 async function syncText(m,r,meta,merge){
   if(!r){const rev=m.rev;const n=await createFile(meta,m.text||'');m.fileId=n.id;m.remoteMod=n.modifiedTime;if(m.rev===rev)m.dirty=false;return}
@@ -507,10 +527,15 @@ async function syncWork(w,folders){
     w.chapters.splice(Math.min(+f.appProperties.order||0,w.chapters.length),0,{id:f.appProperties.chapterId,title:titleFrom(f.name),text:t,dirty:false,rev:1,fileId:f.id,remoteMod:f.modifiedTime})}
   const mf=files.find(f=>f.id===w.memo.fileId)||files.find(f=>(f.appProperties||{}).kind==='makigamiMemo');
   await syncText(w.memo,mf,{name:'設定.md',parents:[folder.id],appProperties:{kind:'makigamiMemo',workId:w.id}},true);
-  const df=files.find(f=>f.id===w.draft.fileId)||files.find(f=>(f.appProperties||{}).kind==='makigamiDraft');
-  if(!df){const n=await createFile({name:'下書き_Claude.md',parents:[folder.id],appProperties:{kind:'makigamiDraft',workId:w.id}},'');w.draft.fileId=n.id;w.draft.remoteMod=n.modifiedTime}
-  else{w.draft.fileId=df.id;if(df.modifiedTime!==w.draft.remoteMod){const t=await download(df.id);w.draft.remoteMod=df.modifiedTime;
-    if(t.trim()&&t!==w.draft.text)w.draft.unread=true;w.draft.text=t}}
+  // Claude が置いた下書き（アプリ以外が作ったファイル）
+  const keep=[];
+  for(const f of files.filter(f=>/^下書き_Claude/.test(f.name)&&!(f.appProperties||{}).kind)){
+    let it=w.draft.items.find(x=>x.id===f.id);
+    if(!it||it.mod!==f.modifiedTime){const t=await download(f.id,f.mimeType);if(!it)it={id:f.id,unread:true,done:false};it.text=t;it.mod=f.modifiedTime;it.time=f.createdTime}
+    keep.push(it);
+  }
+  w.draft.items=keep.sort((a,b)=>a.time<b.time?1:-1);
+  w.draft.unread=keep.some(x=>x.unread);
 }
 async function sync(interactive){
   if(syncing){again=true;return}
@@ -522,7 +547,7 @@ async function sync(interactive){
     return}
   syncing=true;syncErr='';syncLabel();
   try{
-    await ensureRoot();
+    await ensureRoot();await ensureReadme();
     for(const id of S.trashFolders.slice()){try{await patchMeta(id,{trashed:true})}catch(e){if(e.message==='expired')throw e}S.trashFolders=S.trashFolders.filter(x=>x!==id)}
     const folders=await list(`'${S.rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
     for(const f of folders){const wid=(f.appProperties||{}).workId;if(wid&&!S.works.some(w=>w.id===wid)){const w=blankWork(f.name);w.id=wid;w.folderId=f.id;S.works.push(w)}}

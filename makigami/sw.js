@@ -1,5 +1,5 @@
 // 巻紙のオフライン用。中身を変えたら V の番号を上げる
-const V = 'makigami-v1';
+const V = 'makigami-v2';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
