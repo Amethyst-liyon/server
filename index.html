@@ -95,6 +95,25 @@ h2{font-size:13px;letter-spacing:.18em;margin:20px 0 4px;padding-bottom:4px;bord
 .cell[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
 .cell.blank{background:var(--card)}
 
+.seg3{display:grid;grid-template-columns:repeat(3,1fr);border:1.5px solid var(--line);border-radius:999px;overflow:hidden;margin-top:12px}
+.seg3 button{padding:7px 0;font-weight:700;font-size:14px}
+.seg3 button+button{border-left:1.5px solid var(--line)}
+.seg3 button[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.bars{display:grid;gap:2px;margin-top:10px}
+.brow{display:grid;grid-template-columns:5.6em 1fr 6.2em;gap:8px;align-items:center;padding:6px 4px;border-radius:8px;text-align:left;width:100%;font-size:13px}
+.brow .bar{height:12px;background:var(--soft);border-radius:999px;overflow:hidden;display:block}
+.brow .bar i{display:block;height:100%;background:var(--fg);border-radius:999px}
+.brow[aria-pressed="true"] .bar{background:var(--bg)}
+.brow .v{text-align:right;font-weight:700}
+.brow[aria-pressed="true"]{background:var(--soft)}
+.brow.now .l{font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.ysum{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:10px;text-align:center}
+.ysum div{border:1.5px solid var(--line);border-radius:10px;padding:6px 2px;display:grid}
+.ysum span{font-size:11px;color:var(--muted)}
+.ysum b{font-size:15px}
+.ynav{display:flex;justify-content:space-between;align-items:center;margin-top:12px}
+.ynav button{width:38px;height:32px;border:1.5px solid var(--line);border-radius:999px;font-size:18px;line-height:1}
+.ynav b{font-size:18px}
 .rank{display:grid;grid-template-columns:150px 1fr;gap:14px;align-items:center;margin-top:8px}
 @media (max-width:380px){.rank{grid-template-columns:1fr;justify-items:center}}
 .rank svg{width:150px;height:150px}
@@ -194,9 +213,16 @@ h2{font-size:13px;letter-spacing:.18em;margin:20px 0 4px;padding-bottom:4px;bord
   </main>
 
   <main id="tab-cal" hidden>
-    <div class="cal" id="cal"></div>
-    <div id="dayList"></div>
-    <h2><span>カテゴリ順位</span></h2>
+    <div class="seg3" id="calMode" role="group" aria-label="集計の単位">
+      <button data-cm="w" aria-pressed="false">週</button><button data-cm="m" aria-pressed="true">月</button><button data-cm="y" aria-pressed="false">年</button>
+    </div>
+    <div id="calMonth">
+      <div class="cal" id="cal"></div>
+      <div id="dayList"></div>
+    </div>
+    <div id="calWeek" hidden></div>
+    <div id="calYear" hidden></div>
+    <h2><span id="rankTitle">カテゴリ順位</span></h2>
     <div id="rank"></div>
   </main>
 
@@ -434,7 +460,7 @@ function days(list){
   const g={};[...list].sort((a,b)=>b.d.localeCompare(a.d)||b.ts-a.ts).forEach(x=>(g[x.d]=g[x.d]||[]).push(x));
   return Object.entries(g).map(([d,xs])=>{const dt=new Date(d+"T12:00");return`<div class="day"><div class="dayhead"><span>${dt.getMonth()+1}月${dt.getDate()}日（${WD[dt.getDay()]}）</span><span class="num">${yen(xs.reduce((a,b)=>a+b.a,0))}</span></div>${rows(xs)}</div>`}).join("");
 }
-function renderCal(list,s,e){
+function renderMonth(list,s,e){
   const sums={};list.forEach(x=>sums[x.d]=(sums[x.d]||0)+x.a);
   let h=["月","火","水","木","金","土","日"].map((w,i)=>`<div class="wd${i>4?" we":""}">${w}</div>`).join("");
   const lead=(s.getDay()+6)%7;for(let i=0;i<lead;i++)h+=`<div class="cell blank"></div>`;
@@ -446,8 +472,10 @@ function renderCal(list,s,e){
     $("dayList").innerHTML=`<h2><span>${dt.getMonth()+1}月${dt.getDate()}日（${WD[dt.getDay()]}）</span><span class="num">${yen(xs.reduce((a,b)=>a+b.a,0))}</span></h2>`+(xs.length?rows(xs):`<div class="empty">記入はありません。</div>`)+`<button class="btn-line" id="addOnDay" style="margin-top:8px;padding:6px 14px;border-radius:999px;font-size:13px">この日に記入</button>`}
   else $("dayList").innerHTML=`<p class="note">日付をタップすると、その日の明細が出ます。</p>`;
 
-  // 順位ドーナツ
-  const by={};list.forEach(x=>by[x.c]=(by[x.c]||0)+x.a);const r=Object.entries(by).sort((a,b)=>b[1]-a[1]);const tot=r.reduce((a,b)=>a+b[1],0);
+}
+function renderRank(list,label){
+  $("rankTitle").textContent=(label?label+"の":"")+"カテゴリ順位";
+  const by={};list.forEach(x=>by[x.c]=(by[x.c]||0)+x.a);const r=Object.entries(by).filter(x=>x[1]>0).sort((a,b)=>b[1]-a[1]);const tot=r.reduce((a,b)=>a+b[1],0);
   if(!tot){$("rank").innerHTML=`<div class="empty">記入があると、ここに分類ごとの割合が出ます。</div>`;return}
   const shades=r.map((_,i)=>`color-mix(in srgb, var(--fg) ${Math.max(12,100-i*(88/Math.max(1,r.length-1)))}%, var(--bg))`);
   const C=2*Math.PI*42;let off=0;
@@ -455,7 +483,46 @@ function renderCal(list,s,e){
   $("rank").innerHTML=`<div class="rank"><svg viewBox="0 0 120 120" role="img" aria-label="分類ごとの割合"><circle cx="60" cy="60" r="42" fill="none" stroke="var(--soft)" stroke-width="22"/>${segs}<text x="60" y="56" text-anchor="middle" font-size="9" fill="var(--muted)">${kind==="out"?"支出":"収入"}</text><text x="60" y="70" text-anchor="middle" font-size="12" font-weight="700" fill="var(--fg)" font-family="BIZ UDGothic,sans-serif">${yen(tot)}</text></svg>
   <div class="rlist">${r.map(([c,v],i)=>`<div class="ritem"><span class="num">${i+1}</span><i style="background:${shades[i]}"></i><span>${esc(c)}</span><span class="num">${Math.round(v/tot*100)}%</span></div>`).join("")}</div></div>`;
 }
-
+let calMode="m",selWeek=null,calYearY=null;
+function weekStart(d){const x=new Date(d);x.setHours(12,0,0,0);x.setDate(x.getDate()-((x.getDay()+6)%7));return x}
+const md=d=>`${d.getMonth()+1}/${d.getDate()}`;
+function barRows(rows,max){return rows.map(r=>`<button class="brow${r.now?" now":""}" ${r.attr} aria-pressed="${!!r.on}"><span class="l num">${r.label}</span><span class="bar"><i style="width:${max>0?Math.max(0,r.v)/max*100:0}%"></i></span><span class="v num">${r.v?yen(r.v):"—"}</span></button>`).join("")}
+function renderWeek(list,s,e){
+  const weeks=[];for(let w=weekStart(s);w<e;w=new Date(w.getFullYear(),w.getMonth(),w.getDate()+7,12)){
+    const we=new Date(w.getFullYear(),w.getMonth(),w.getDate()+7,12);const a=ymd(w<s?s:w),b=ymd(we>e?e:we);
+    const xs=list.filter(x=>x.d>=a&&x.d<b);weeks.push({k:ymd(w),w,we,xs,v:xs.reduce((t,x)=>t+x.a,0),now:TODAY>=ymd(w)&&TODAY<ymd(we)})}
+  if(!selWeek||!weeks.some(x=>x.k===selWeek))selWeek=(weeks.find(x=>x.now)||weeks[0]).k;
+  const max=Math.max(0,...weeks.map(x=>x.v));const sel=weeks.find(x=>x.k===selWeek);
+  const days7=[];for(let i=0;i<7;i++){const d=new Date(sel.w.getFullYear(),sel.w.getMonth(),sel.w.getDate()+i,12);const k=ymd(d);const xs=list.filter(x=>x.d===k);days7.push({label:`${md(d)}（${WD[d.getDay()]}）`,v:xs.reduce((t,x)=>t+x.a,0),now:k===TODAY,attr:`data-day="${k}" data-wk="1"`,on:selDay===k})}
+  const dmax=Math.max(0,...days7.map(x=>x.v));const avg=Math.round(sel.v/7);
+  $("calWeek").innerHTML=`<h2><span>週ごとの${kind==="out"?"支出":"収入"}</span><span class="num">月曜はじまり</span></h2><div class="bars">${barRows(weeks.map(x=>({label:`${md(x.w)}〜`,v:x.v,now:x.now,on:x.k===selWeek,attr:`data-week="${x.k}"`})),max)}</div>
+  <h2><span>${md(sel.w)}〜${md(new Date(sel.we.getTime()-864e5))} の内訳</span><span class="num">${yen(sel.v)}（1日 ${yen(avg)}）</span></h2><div class="bars">${barRows(days7,dmax)}</div>
+  ${selDay&&days7.some(x=>x.on)?(()=>{const xs=list.filter(x=>x.d===selDay);return xs.length?rows(xs):`<div class="empty">記入はありません。</div>`})():`<p class="note">日付をタップすると、その日の明細が出ます。</p>`}`;
+  renderRank(sel.xs,"この週");
+}
+async function renderYear(){
+  const S=settings.start;if(calYearY===null)calYearY=P.y;const Y=calYearY;
+  $("calYear").innerHTML=`<div class="empty">集計しています…</div>`;
+  let all;try{all=(await loadAll()).flatMap(m=>m.items).filter(x=>(x.k||"out")===kind)}catch(e){$("calYear").innerHTML=`<div class="empty">読み込めませんでした。</div>`;return}
+  if(calMode!=="y")return;
+  const ys=ymd(new Date(Y,0,S,12)),ye=ymd(new Date(Y+1,0,S,12));const yl=all.filter(x=>x.d>=ys&&x.d<ye);
+  const months=[];for(let m=0;m<12;m++){const a=ymd(new Date(Y,m,S,12)),b=ymd(new Date(Y,m+1,S,12));const v=yl.filter(x=>x.d>=a&&x.d<b).reduce((t,x)=>t+x.a,0);months.push({m,v,a,b,now:TODAY>=a&&TODAY<b,on:P.y===Y&&P.m===m})}
+  const tot=months.reduce((t,x)=>t+x.v,0);const used=months.filter(x=>x.a<=TODAY&&x.v!==0);const avg=used.length?Math.round(tot/used.length):0;
+  const top=months.reduce((a,b)=>b.v>a.v?b:a,months[0]);const max=Math.max(0,...months.map(x=>x.v));
+  const firstY=all.length?+all.reduce((a,x)=>x.d<a?x.d:a,"9999").slice(0,4)-1:Y;
+  $("calYear").innerHTML=`<div class="ynav"><button id="yPrev" aria-label="前の年"${Y<=firstY?" disabled":""}>‹</button><b class="num">${Y}年</b><button id="yNext" aria-label="次の年"${Y>=now.getFullYear()?" disabled":""}>›</button></div>
+  <p class="note" style="margin:2px 0 0;text-align:center">${S===1?"1月〜12月":`1月（1/${S}〜）から12月（〜翌1/${S-1}）まで`}</p>
+  <div class="ysum"><div><span>年間の${kind==="out"?"支出":"収入"}</span><b class="num">${yen(tot)}</b></div><div><span>月平均</span><b class="num">${yen(avg)}</b></div><div><span>いちばん多い月</span><b class="num">${top.v?top.m+1+"月":"—"}</b></div></div>
+  <h2><span>月ごとの${kind==="out"?"支出":"収入"}</span><span class="num">タップでその月へ</span></h2><div class="bars">${barRows(months.map(x=>({label:`${x.m+1}月`,v:x.v,now:x.now,on:x.on,attr:`data-ym="${x.m}"`})),max)}</div>`;
+  renderRank(yl,`${Y}年`);
+}
+function renderCal(list,s,e){
+  document.querySelectorAll("#calMode button").forEach(b=>b.setAttribute("aria-pressed",b.dataset.cm===calMode));
+  $("calMonth").hidden=calMode!=="m";$("calWeek").hidden=calMode!=="w";$("calYear").hidden=calMode!=="y";
+  if(calMode==="m"){renderMonth(list,s,e);renderRank(list,"この月")}
+  else if(calMode==="w")renderWeek(list,s,e);
+  else renderYear();
+}
 /* ---------- CSV書き出し ---------- */
 const csvCell=v=>{v=String(v??"");return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v};
 async function exportCsv(all){
@@ -648,6 +715,11 @@ $("tiles").addEventListener("click",e=>{const b=e.target.closest("[data-cat]");i
   const {s,e:en}=range();const inP=now>=s&&now<en;openSheet({k:kind,c:b.dataset.cat,d:inP?TODAY:ymd(s)})});
 document.addEventListener("click",e=>{
   const r=e.target.closest("[data-edit]");if(r){const x=periodItemsAll().find(y=>y.id===r.dataset.edit);if(x)openSheet({id:x.id,k:x.k||"out",c:x.c,d:x.d,a:x.a,t:x.t,ts:x.ts});return}
+  const cm=e.target.closest("[data-cm]");if(cm){calMode=cm.dataset.cm;if(calMode==="y")calYearY=P.y;selDay=null;render();return}
+  const wk=e.target.closest("[data-week]");if(wk){selWeek=wk.dataset.week;selDay=null;render();return}
+  const ym=e.target.closest("[data-ym]");if(ym){P={y:calYearY,m:+ym.dataset.ym};calMode="m";subscribe();window.scrollTo(0,0);return}
+  if(e.target.closest("#yPrev")){calYearY--;render();return}
+  if(e.target.closest("#yNext")){calYearY++;render();return}
   const c=e.target.closest("[data-day]");if(c){selDay=selDay===c.dataset.day?null:c.dataset.day;render();return}
   if(e.target.closest("#addOnDay"))openSheet({k:kind,d:selDay});
 });
@@ -706,7 +778,7 @@ render();
   runRecurring();
 })();
 /* ---------- 更新の確認 ---------- */
-const APP_VER="2026.10.18-1";$("appVer").textContent=APP_VER;
+const APP_VER="2026.10.18-2";$("appVer").textContent=APP_VER;
 async function checkUpdate(manual){
   try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const v=(await r.json()).v;
     if(v&&v!==APP_VER){$("upd").hidden=false}else if(manual)toast("最新の版です")}
