@@ -66,6 +66,24 @@ svg.ic{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.7;str
 .qprev b{color:var(--fg)}
 
 /* 分類タイル */
+.vb{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:14px}
+.vbc{border:1.5px solid var(--line);border-radius:12px;overflow:hidden;display:grid;text-align:left;min-width:0}
+.vbc .h{padding:6px 10px;font-size:13px;font-weight:700;border-bottom:1.5px solid var(--line);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vbc .b{padding:8px 10px;display:grid;gap:4px}
+.vbc .r{font-size:22px;font-weight:700;line-height:1.1}
+.vbc .r small{font-size:12px;font-weight:400;margin-left:2px}
+.vbc .f{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
+.vbc .g{height:6px;background:var(--soft);border-radius:999px;overflow:hidden}
+.vbc .g i{display:block;height:100%;background:var(--fg);border-radius:999px}
+.vbc.over .r{color:var(--warn)}
+.vbc.over .g i{background:var(--warn)}
+.vbset{border:1.5px solid var(--line);border-radius:12px;padding:10px;display:grid;gap:8px;margin-top:8px}
+.vbset .two2{display:grid;grid-template-columns:1fr 8em;gap:6px}
+.vbset input{min-width:0;width:100%;padding:7px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg)}
+.vbchips{display:flex;flex-wrap:wrap;gap:6px}
+.vbchip{border:1.5px solid var(--line);border-radius:999px;padding:3px 10px;font-size:12px}
+.vbchip[aria-pressed="true"]{background:var(--fg);color:var(--bg)}
+.vbchip.off{text-decoration:line-through;opacity:.5}
 .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
 .tile{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:10px 4px 8px;display:grid;justify-items:center;gap:2px;text-align:center;min-width:0}
 .tile .v{font-size:16px;font-weight:700}
@@ -201,6 +219,7 @@ h2{font-size:13px;letter-spacing:.18em;margin:20px 0 4px;padding-bottom:4px;bord
   </header>
 
   <main id="tab-home">
+    <div class="vb" id="vb"></div>
     <div class="tiles" id="tiles"></div>
     <div id="homeList"></div>
   </main>
@@ -234,6 +253,9 @@ h2{font-size:13px;letter-spacing:.18em;margin:20px 0 4px;padding-bottom:4px;bord
       <input type="file" id="csvFile" accept=".csv,text/csv,text/comma-separated-values,text/plain" hidden>
       <p class="note" style="margin-top:6px">帳簿・日付・カテゴリ・金額・メモの列があるCSVを取り込みます。すでに同じ明細（日付・分類・金額・メモが同じ）があるものは飛ばします。知らない分類は自動で追加します。</p>
     </section>
+    <h2><span>変動予算</span></h2>
+    <div id="vbSet"></div>
+    <p class="note">ホームの上に出る2つの予算です。左は選んだ分類の合計、右は左に入れなかった支出の合計を、それぞれの予算から引いて残りを出します。右で外したい分類はタップすると取り消し線になり、計算に入らなくなります。</p>
     <h2><span>自動で記録</span></h2>
     <div id="recList"></div>
     <form class="recform" id="recForm" autocomplete="off">
@@ -401,7 +423,8 @@ function makeDbStore(db,uid){const base="data/users/"+uid;let chain=Promise.reso
     return keys.map((k,i)=>snaps[i].exists?{k,items:norm((snaps[i].data()||{}).items)}:null).filter(Boolean)}}}
 
 /* ---------- 状態 ---------- */
-let settings={start:22,budget:0,learn:{},cats:JSON.parse(JSON.stringify(DEF_CATS))};
+const DEF_VB={a:{n:"固定変動予算",amt:45000,cats:["食費","日用品","ガソリン代"]},b:{n:"娯楽変動予算",amt:45000,exclude:[]}};
+let settings={start:22,budget:0,learn:{},cats:JSON.parse(JSON.stringify(DEF_CATS)),vb:JSON.parse(JSON.stringify(DEF_VB))};
 let kind="out",tab="home",selDay=null,docs={},unsubs=[];
 let P=periodOf(now);
 let saveT;function saveSettings(){clearTimeout(saveT);saveT=setTimeout(()=>store&&store.saveSettings(settings).catch(()=>{}),400)}
@@ -437,6 +460,12 @@ function render(){
     bx.innerHTML=`<div class="gauge${left<0?" over":""}"><i style="width:${Math.min(100,sOut/B*100)}%"></i>${inP?`<b style="left:${el/days*100}%"></b>`:""}</div>
     <div class="num" style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><span>予算 ${yen(B)} ・ ${left<0?`<span class="over">${yen(-left)} 超過</span>`:`残り ${yen(left)}`}</span>${inP&&left>0?`<span>1日 ${yen(left/(days-el+1))} まで</span>`:""}</div>`}
 
+  // 変動予算
+  {const vb=settings.vb||DEF_VB;const A=new Set(vb.a.cats||[]),EX=new Set(vb.b.exclude||[]);
+   const sa=out.filter(x=>A.has(x.c)).reduce((t,x)=>t+x.a,0),sb=out.filter(x=>!A.has(x.c)&&!EX.has(x.c)).reduce((t,x)=>t+x.a,0);
+   const card=(c,used,who)=>{const left=(+c.amt||0)-used;const over=left<0;const pct=c.amt>0?Math.min(100,Math.max(0,used/c.amt*100)):0;
+     return`<button class="vbc${over?" over":""}" data-vb="${who}" aria-label="${esc(c.n)} 残り${yen(left)}円"><span class="h">${esc(c.n)}</span><span class="b"><span class="r num">${over?"−":""}${yen(Math.abs(left))}<small>${over?"円 超過":"円 残り"}</small></span><span class="g"><i style="width:${pct}%"></i></span><span class="f num">${yen(c.amt||0)} − ${yen(used)}</span></span></button>`};
+   $("vb").innerHTML=card(vb.a,sa,"a")+card(vb.b,sb,"b");}
   // タイル
   const list=kind==="out"?out:inc;const by={};list.forEach(x=>by[x.c]=(by[x.c]||0)+x.a);
   const cats=[...settings.cats[kind]];Object.keys(by).forEach(n=>{if(!cats.some(c=>c.n===n))cats.push({n,i:"dots"})});
@@ -630,7 +659,24 @@ $("recList").addEventListener("click",async e=>{const b=e.target.closest("[data-
   if(recDelSure!==i){recDelSure=i;b.classList.add("sure");b.textContent="消す";return}
   recDelSure=null;settings.rec.splice(i,1);renderRec();toast("自動記録をやめました（記入済みの分は残ります）");try{await store.saveSettings(settings)}catch(e){}});
 
+function renderVbSet(){
+  const vb=settings.vb;const A=new Set(vb.a.cats),EX=new Set(vb.b.exclude);const cats=settings.cats.out.map(c=>c.n);
+  $("vbSet").innerHTML=`<div class="vbset"><div class="two2"><input id="vbAn" value="${esc(vb.a.n)}" aria-label="左の予算の名前"><input id="vbAa" class="num" inputmode="numeric" value="${vb.a.amt}" aria-label="左の予算の金額"></div>
+    <div class="vbchips">${cats.map(c=>`<button class="vbchip" data-vbA="${esc(c)}" aria-pressed="${A.has(c)}">${esc(c)}</button>`).join("")}</div></div>
+    <div class="vbset"><div class="two2"><input id="vbBn" value="${esc(vb.b.n)}" aria-label="右の予算の名前"><input id="vbBa" class="num" inputmode="numeric" value="${vb.b.amt}" aria-label="右の予算の金額"></div>
+    <div class="vbchips">${cats.filter(c=>!A.has(c)).map(c=>`<button class="vbchip${EX.has(c)?" off":""}" data-vbB="${esc(c)}" aria-pressed="false">${esc(c)}</button>`).join("")||`<span class="note">左にすべて入っています</span>`}</div></div>`;
+}
+$("vbSet").addEventListener("click",e=>{const a=e.target.closest("[data-vbA]"),b=e.target.closest("[data-vbB]");const vb=settings.vb;
+  if(a){const n=a.dataset.vba;vb.a.cats=vb.a.cats.includes(n)?vb.a.cats.filter(x=>x!==n):[...vb.a.cats,n];vb.b.exclude=vb.b.exclude.filter(x=>x!==n)}
+  else if(b){const n=b.dataset.vbb;vb.b.exclude=vb.b.exclude.includes(n)?vb.b.exclude.filter(x=>x!==n):[...vb.b.exclude,n]}
+  else return;saveSettings();renderVbSet();render()});
+$("vbSet").addEventListener("change",e=>{const vb=settings.vb;const t=e.target;
+  if(t.id==="vbAn")vb.a.n=t.value.trim()||DEF_VB.a.n;else if(t.id==="vbBn")vb.b.n=t.value.trim()||DEF_VB.b.n;
+  else if(t.id==="vbAa")vb.a.amt=toAmt(t.value);else if(t.id==="vbBa")vb.b.amt=toAmt(t.value);else return;
+  saveSettings();renderVbSet();render();toast("変動予算を保存しました")});
+$("vb").addEventListener("click",e=>{if(!e.target.closest("[data-vb]"))return;document.querySelector('[data-tab=set]').click();setTimeout(()=>$("vbSet").scrollIntoView({block:"start"}),50)});
 function renderSet(){
+  renderVbSet();
   renderRec();
   $("setStart").innerHTML=Array.from({length:28},(_,i)=>`<option value="${i+1}"${settings.start===i+1?" selected":""}>${i+1}日から</option>`).join("");
   $("setBudget").value=settings.budget||"";
@@ -739,7 +785,7 @@ $("tab-set").addEventListener("click",async e=>{
 });
 $("tab-set").addEventListener("change",e=>{const t=e.target;if(t.dataset.i===undefined||!t.dataset.k||t.tagName!=="INPUT")return;
   const k=t.dataset.k,i=+t.dataset.i,n=t.value.trim();const L=settings.cats[k];if(!n||L.some((c,j)=>j!==i&&c.n===n)){t.value=L[i].n;return}
-  const oldN=L[i].n;L[i].n=n;(settings.rec||[]).forEach(r=>{if(r.k===k&&r.c===oldN)r.c=n});Object.keys(settings.learn||{}).forEach(w=>{if(settings.learn[w]===oldN)settings.learn[w]=n});saveSettings();render();toast("名前を変えました（過去の明細はそのまま）")});
+  const oldN=L[i].n;L[i].n=n;if(k==="out"&&settings.vb){settings.vb.a.cats=settings.vb.a.cats.map(x=>x===oldN?n:x);settings.vb.b.exclude=settings.vb.b.exclude.map(x=>x===oldN?n:x)}(settings.rec||[]).forEach(r=>{if(r.k===k&&r.c===oldN)r.c=n});Object.keys(settings.learn||{}).forEach(w=>{if(settings.learn[w]===oldN)settings.learn[w]=n});saveSettings();render();toast("名前を変えました（過去の明細はそのまま）")});
 
 /* ---------- 起動 ---------- */
 render();
@@ -748,12 +794,12 @@ render();
   $("storeNote").textContent="記録はこのスマホの中だけに保存されています。ネットがなくても使えます。";
   try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch(e){}
   ["put","putMany","remove"].forEach(fn=>{const raw=store[fn].bind(store);store[fn]=async(k,x)=>{allMonths=null;const r=await raw(k,x);if(k.startsWith("m-")&&!(settings.months||[]).includes(k)){settings.months=[...(settings.months||[]),k].sort();saveSettings()}return r}});
-  try{const st=JSON.parse(JSON.stringify(await store.settings()));settings={...settings,...st,cats:st.cats&&st.cats.out?st.cats:settings.cats,start:st.start||22}}catch(e){}
+  try{const st=JSON.parse(JSON.stringify(await store.settings()));settings={...settings,...st,cats:st.cats&&st.cats.out?st.cats:settings.cats,start:st.start||22,vb:st.vb&&st.vb.a&&st.vb.b?st.vb:settings.vb}}catch(e){}
   P=periodOf(now);subscribe();
   runRecurring();
 })();
 /* ---------- 更新の確認 ---------- */
-const APP_VER="2026.10.18-3";$("appVer").textContent=APP_VER;
+const APP_VER="2026.10.18-4";$("appVer").textContent=APP_VER;
 async function checkUpdate(manual){
   try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const v=(await r.json()).v;
     if(v&&v!==APP_VER){$("upd").hidden=false}else if(manual)toast("最新の版です")}
