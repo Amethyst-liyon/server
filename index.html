@@ -75,8 +75,8 @@ svg.ic{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.7;str
 .vbc .f{font-size:11px;color:var(--muted);overflow-wrap:anywhere}
 .vbc .g{height:6px;background:var(--soft);border-radius:999px;overflow:hidden}
 .vbc .g i{display:block;height:100%;background:var(--fg);border-radius:999px}
-.vbc.over .r{color:var(--warn)}
-.vbc.over .g i{background:var(--warn)}
+.vbc.vbover .r{color:var(--warn)}
+.vbc.vbover .g i{background:var(--warn)}
 .vbset{border:1.5px solid var(--line);border-radius:12px;padding:10px;display:grid;gap:8px;margin-top:8px}
 .vbset .two2{display:grid;grid-template-columns:1fr 8em;gap:6px}
 .vbset input{min-width:0;width:100%;padding:7px 10px;border:1.5px solid var(--line);border-radius:8px;background:var(--bg)}
@@ -464,7 +464,7 @@ function render(){
   {const vb=settings.vb||DEF_VB;const A=new Set(vb.a.cats||[]),EX=new Set(vb.b.exclude||[]);
    const sa=out.filter(x=>A.has(x.c)).reduce((t,x)=>t+x.a,0),sb=out.filter(x=>!A.has(x.c)&&!EX.has(x.c)).reduce((t,x)=>t+x.a,0);
    const card=(c,used,who)=>{const left=(+c.amt||0)-used;const over=left<0;const pct=c.amt>0?Math.min(100,Math.max(0,used/c.amt*100)):0;
-     return`<button class="vbc${over?" over":""}" data-vb="${who}" aria-label="${esc(c.n)} 残り${yen(left)}円"><span class="h">${esc(c.n)}</span><span class="b"><span class="r num">${over?"−":""}${yen(Math.abs(left))}<small>${over?"円 超過":"円 残り"}</small></span><span class="g"><i style="width:${pct}%"></i></span><span class="f num">${yen(c.amt||0)} − ${yen(used)}</span></span></button>`};
+     return`<button class="vbc${over?" vbover":""}" data-vb="${who}" aria-label="${esc(c.n)} 残り${yen(left)}円"><span class="h">${esc(c.n)}</span><span class="b"><span class="r num">${over?"−":""}${yen(Math.abs(left))}<small>${over?"円 超過":"円 残り"}</small></span><span class="g"><i style="width:${pct}%"></i></span><span class="f num">${yen(c.amt||0)} − ${yen(used)}</span></span></button>`};
    $("vb").innerHTML=card(vb.a,sa,"a")+card(vb.b,sb,"b");}
   // タイル
   const list=kind==="out"?out:inc;const by={};list.forEach(x=>by[x.c]=(by[x.c]||0)+x.a);
@@ -800,7 +800,7 @@ render();
   runRecurring();
 })();
 /* ---------- 更新の確認 ---------- */
-const APP_VER="2026.10.18-5";$("appVer").textContent=APP_VER;
+const APP_VER="2026.10.18-6";$("appVer").textContent=APP_VER;
 async function checkUpdate(manual){
   try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const v=(await r.json()).v;
     if(v&&v!==APP_VER){$("upd").hidden=false}else if(manual)toast("最新の版です")}
