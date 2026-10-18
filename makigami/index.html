@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>巻紙</title>
+<meta name="theme-color" content="#fdfdfb" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#121211" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Shippori+Mincho:wght@400;600&display=swap">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<style>
+/* 巻紙：白い紙に墨。本文は右から左へ流れる一本の巻物。朱は「いまここ」だけに使う */
+:root{
+  --paper:#fdfdfb; --ink:#141413; --sub:#6e6d68; --line:#e2e1db; --panel:#f5f4f0; --shu:#c4321c;
+  --font-body:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho","YuMincho","Noto Serif JP",serif;
+  --font-ui:"BIZ UDPGothic","Hiragino Sans","Yu Gothic UI","Noto Sans JP",sans-serif;
+  --fs:18px;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{--paper:#121211;--ink:#ecebe6;--sub:#9b9a94;--line:#2d2d2a;--panel:#1b1b19;--shu:#e5674f;color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--font-ui);font-size:14px;display:flex;flex-direction:column;overflow:hidden;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+button,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--shu);outline-offset:2px}
+
+/* 上の帯 */
+header{display:flex;align-items:center;gap:8px;height:46px;border-bottom:1px solid var(--line);
+  padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}
+#workBtn{flex:1;min-width:0;text-align:left;background:none;border:0;padding:6px 4px;font-family:var(--font-body);font-size:17px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hbtn{background:none;border:1px solid var(--line);border-radius:4px;padding:6px 10px;font-size:13px;white-space:nowrap;position:relative}
+.hbtn:hover{border-color:var(--ink)}
+.dot{position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:var(--shu)}
+
+/* 巻物 */
+#scroll{flex:1;min-height:0;writing-mode:vertical-rl;overflow-x:auto;overflow-y:auto;
+  padding:18px max(28px,env(safe-area-inset-right,0px)) 18px max(28px,env(safe-area-inset-left,0px));
+  font-family:var(--font-body);font-size:var(--fs);line-height:1.95;font-feature-settings:"vert","vrt2";scrollbar-width:thin}
+.cover{margin-inline:auto;inline-size:calc(var(--fs)*40);padding-block-end:2.2em;margin-block-end:2em;border-block-end:1px solid var(--line)}
+.cover h1{margin:0;font-size:1.6em;font-weight:600;letter-spacing:.08em;padding-inline-start:2em;line-height:1.5}
+.cover p{margin:0;color:var(--sub);font-size:.72em;padding-inline-start:2.6em;font-family:var(--font-ui)}
+.chap{margin-inline:auto;inline-size:calc(var(--fs)*40);padding-block-end:2.4em;margin-block-end:2.4em;border-block-end:1px dashed var(--line)}
+.chap h2{margin:0 0 0 0;margin-block-end:1.3em;font-size:1.22em;font-weight:600;padding-inline-start:2.5em;line-height:1.6;letter-spacing:.06em}
+.chap.on h2{color:var(--ink)}
+.chap.on h2::before{content:"";display:block;inline-size:.9em;block-size:2px;background:var(--shu);margin-block-end:.4em;margin-inline-start:-1.4em}
+.body{cursor:text;min-block-size:3em}
+.body p{margin:0}
+.body p.blank{min-block-size:1em}
+.body .ph{color:var(--sub)}
+ruby rt{font-size:.5em;font-family:var(--font-body)}
+.bt{font-style:normal;-webkit-text-emphasis:filled sesame;text-emphasis:filled sesame}
+textarea.ed{display:block;writing-mode:vertical-rl;inline-size:calc(var(--fs)*40);block-size:3em;margin:0;padding:0;border:0;outline:0;resize:none;overflow:hidden;
+  background:transparent;font-family:var(--font-body);font-size:var(--fs);line-height:1.95;caret-color:var(--shu);font-feature-settings:"vert","vrt2"}
+.addchap{margin-inline:auto;inline-size:calc(var(--fs)*14);margin-block-end:4em;background:none;border:1px dashed var(--sub);border-radius:4px;
+  padding:1em .5em;color:var(--sub);font-family:var(--font-ui);font-size:.8em;letter-spacing:.2em}
+.addchap:hover{color:var(--ink);border-color:var(--ink)}
+
+/* 下の帯 */
+footer{border-top:1px solid var(--line);padding:6px max(12px,env(safe-area-inset-right,0px)) 6px max(12px,env(safe-area-inset-left,0px));display:flex;flex-direction:column;gap:5px}
+#map{position:relative;height:14px;background:var(--panel);border:1px solid var(--line);border-radius:2px;cursor:pointer;overflow:hidden}
+#map .seg{position:absolute;top:0;bottom:0;border-left:1px solid var(--sub);opacity:.55}
+#map .seg.alt{background:var(--line)}
+#view{position:absolute;top:-1px;bottom:-1px;border:2px solid var(--shu);border-radius:2px;pointer-events:none;min-width:4px}
+#stats{display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
+#stats b{color:var(--ink);font-weight:700}
+#syncBtn{margin-left:auto;background:none;border:1px solid var(--line);border-radius:999px;padding:2px 10px;font-size:12px;color:var(--sub)}
+#syncBtn.ok{color:var(--ink)}
+#syncBtn.err,#syncBtn.need{color:var(--shu);border-color:var(--shu)}
+
+/* 引き出し */
+#shade{position:fixed;inset:0;background:rgba(0,0,0,.18);opacity:0;pointer-events:none;transition:opacity .2s}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(400px,92vw);background:var(--paper);border-left:1px solid var(--ink);
+  transform:translateX(100%);transition:transform .22s ease;display:flex;flex-direction:column;z-index:5;
+  padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);padding-right:env(safe-area-inset-right,0px)}
+body.open #drawer{transform:none}
+body.open #shade{opacity:1;pointer-events:auto}
+@media (prefers-reduced-motion: reduce){#drawer,#shade{transition:none}}
+.tabs{display:flex;border-bottom:1px solid var(--line)}
+.tabs button{flex:1;background:none;border:0;border-bottom:2px solid transparent;padding:12px 4px;font-size:13px;color:var(--sub);position:relative}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink);font-weight:700}
+.tabs .dot{top:8px;right:14%}
+.pane{flex:1;overflow:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.pane h3{margin:0;font-size:12px;letter-spacing:.12em;color:var(--sub);font-weight:700}
+.field{display:flex;flex-direction:column;gap:6px}
+.field input,.memo,.ta{width:100%;border:1px solid var(--line);border-radius:4px;background:var(--paper);padding:8px 10px}
+.field input:focus,.memo:focus,.ta:focus{border-color:var(--ink);outline:0}
+.memo{flex:1;min-height:320px;resize:vertical;font-family:var(--font-body);font-size:15px;line-height:1.8}
+.rows{display:flex;flex-direction:column;border-top:1px solid var(--line)}
+.row{display:flex;align-items:center;gap:4px;border-bottom:1px solid var(--line);padding:4px 0}
+.row input{flex:1;min-width:0;border:0;background:none;padding:8px 4px;font-family:var(--font-body);font-size:15px}
+.row input:focus{outline:0;box-shadow:inset 0 -2px 0 var(--ink)}
+.ib{background:none;border:0;padding:6px 7px;color:var(--sub);font-size:13px;border-radius:4px;white-space:nowrap}
+.ib:hover{color:var(--ink);background:var(--panel)}
+.ib.warn{color:var(--shu)}
+.row .num{width:2.4em;color:var(--sub);font-size:12px;text-align:center;font-variant-numeric:tabular-nums}
+.btn{background:var(--ink);color:var(--paper);border:0;border-radius:4px;padding:9px 14px;font-weight:700}
+.btn.ghost{background:none;color:var(--ink);border:1px solid var(--ink)}
+.btn.warn{background:none;color:var(--shu);border:1px solid var(--shu)}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.works button.w{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--line);padding:10px 4px;font-family:var(--font-body);font-size:15px}
+.works button.w[aria-current="true"]{font-weight:600}
+.works button.w[aria-current="true"]::before{content:"● ";color:var(--shu);font-size:10px}
+.note{font-size:12.5px;line-height:1.75;color:var(--sub);margin:0}
+.note code{font-family:ui-monospace,monospace;background:var(--panel);padding:1px 4px;border-radius:3px;color:var(--ink)}
+.draft{border:1px solid var(--line);border-radius:4px;padding:12px;font-family:var(--font-body);font-size:15px;line-height:1.85;white-space:pre-wrap;max-height:46vh;overflow:auto}
+.draft.empty{color:var(--sub);font-family:var(--font-ui);font-size:13px}
+ol.steps{margin:0;padding-left:1.3em;font-size:12.5px;line-height:1.8;color:var(--sub)}
+#toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--paper);
+  padding:9px 14px;border-radius:4px;font-size:13px;max-width:min(92vw,520px);z-index:9;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+<header>
+  <button id="workBtn" type="button" aria-label="作品と章の一覧を開く">無題</button>
+  <button class="hbtn" id="addBtn" type="button">＋ 章</button>
+  <button class="hbtn" id="drawerBtn" type="button" aria-label="引き出しを開く">引き出し<span class="dot" id="drawerDot" hidden></span></button>
+</header>
+
+<main id="scroll" aria-label="本文"></main>
+
+<footer>
+  <div id="map" role="slider" aria-label="巻物の全体図。クリックで移動" tabindex="0"><div id="view"></div></div>
+  <div id="stats">
+    <span id="stCur"></span>
+    <span id="stAll"></span>
+    <span id="stToday"></span>
+    <button id="syncBtn" type="button">同期：未設定</button>
+  </div>
+</footer>
+
+<div id="shade"></div>
+<aside id="drawer" aria-label="引き出し">
+  <div class="tabs" role="tablist">
+    <button role="tab" data-tab="work" aria-selected="true">作品・章</button>
+    <button role="tab" data-tab="memo" aria-selected="false">設定メモ</button>
+    <button role="tab" data-tab="claude" aria-selected="false">Claude<span class="dot" id="claudeDot" hidden></span></button>
+    <button role="tab" data-tab="sync" aria-selected="false">同期</button>
+  </div>
+
+  <section class="pane" data-pane="work">
+    <div class="field"><h3>作品名</h3><input id="wTitle" type="text" autocomplete="off"></div>
+    <div class="field"><h3>章</h3><div class="rows" id="chapRows"></div></div>
+    <div class="btns"><button class="btn ghost" id="addChap2" type="button">＋ 章を足す</button><button class="btn ghost" id="exportBtn" type="button">テキストで書き出す</button></div>
+    <div class="field works"><h3>作品の切り替え</h3><div id="workList"></div></div>
+    <div class="btns"><button class="btn ghost" id="newWork" type="button">＋ 新しい作品</button><button class="btn warn" id="delWork" type="button">この作品を消す</button></div>
+  </section>
+
+  <section class="pane" data-pane="memo" hidden>
+    <h3>設定メモ</h3>
+    <p class="note">登場する種族、地名、出来事の順番など。ドライブには「設定.md」として保存され、Claude も読めます。</p>
+    <textarea class="memo" id="memo" placeholder="例）島の東側には夜だけ動く種族がいる"></textarea>
+  </section>
+
+  <section class="pane" data-pane="claude" hidden>
+    <h3>Claudeの下書き</h3>
+    <p class="note">Claude に「巻紙の〈作品名〉の下書きに書いて」と頼むと、ドライブの <code>下書き_Claude.md</code> に書き込まれます。同期するとここに届きます。本文には自動で入らないので、使うときだけ取り込んでください。</p>
+    <div class="draft empty" id="draftBox">まだ下書きはありません。</div>
+    <div class="btns"><button class="btn" id="draftAppend" type="button">今の章の最後に足す</button><button class="btn ghost" id="draftNew" type="button">新しい章にする</button></div>
+    <h3>Claudeが読めるもの</h3>
+    <p class="note">ドライブの「執筆」フォルダにある章ファイル（1章1ファイル）と設定.md。アイデア出しを頼むときは作品名を伝えると読みに行けます。</p>
+  </section>
+
+  <section class="pane" data-pane="sync" hidden>
+    <h3>Googleドライブ同期</h3>
+    <p class="note" id="syncInfo">まだつながっていません。</p>
+    <div class="field"><h3>クライアントID</h3><input id="clientId" type="text" placeholder="xxxx.apps.googleusercontent.com" autocomplete="off" spellcheck="false"></div>
+    <div class="btns"><button class="btn" id="connectBtn" type="button">ドライブにつなぐ・同期する</button></div>
+    <ol class="steps">
+      <li>Google Cloud でプロジェクトを作り、Google Drive API を有効にする</li>
+      <li>OAuth 同意画面を「外部・テスト中」で作り、自分をテストユーザーに追加</li>
+      <li>OAuth クライアントID（ウェブ）を作り、承認済みの JavaScript 生成元に <code id="originHint"></code> を入れる</li>
+      <li>できたクライアントIDを上に貼り付けて「ドライブにつなぐ」</li>
+    </ol>
+    <p class="note">原稿は「執筆／作品名」フォルダに章ごとのファイルで入ります。このアプリが作ったファイルしか触りません。PC とスマホで同じクライアントIDを入れてください。</p>
+  </section>
+</aside>
+<div id="toast" role="status"></div>
+
+<script>
+'use strict';
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const LS='makigami.v1';
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-5);
+const el=(t,c)=>{const e=document.createElement(t);if(c)e.className=c;return e};
+const KAN='〇一二三四五六七八九';
+function kanji(n){if(n<10)return KAN[n];if(n<20)return '十'+(n%10?KAN[n%10]:'');if(n<100)return KAN[Math.floor(n/10)]+'十'+(n%10?KAN[n%10]:'');return String(n)}
+
+/* ---------- 状態 ---------- */
+function blankWork(title){return{id:uid(),title,chapters:[],memo:{text:'',dirty:false,rev:0,fileId:'',remoteMod:''},draft:{text:'',fileId:'',remoteMod:'',unread:false},folderId:'',trash:[]}}
+function newChapter(title,text){return{id:uid(),title,text:text||'',dirty:true,rev:1,fileId:'',remoteMod:''}}
+function sampleWork(){
+  const w=blankWork('使い方');
+  w.chapters.push(newChapter('巻紙の使い方',
+'　ここは巻紙のサンプルです。読み終えたら、引き出しの「この作品を消す」で消してかまいません。\n　本文をタップすると、そのまま書けます。漢字にふりがなを付けるときは｜巻紙《まきがみ》のように書きます。漢字だけの言葉なら縦書《たてが》きのように縦線を省けます。\n　強調したい言葉には《《傍点》》を打てます。\n\n　右から左へ、巻物のように書き進めていきます。画面の下の細い帯で、いまどのあたりにいるかがわかります。'));
+  w.memo.text='（設定メモの例）\n・舞台：文明のない島\n・ここに種族や地名を書いておくと、Claudeに相談するときにも使えます';
+  return w;
+}
+let S;
+function load(){
+  try{S=JSON.parse(localStorage.getItem(LS))}catch(e){S=null}
+  if(!S||!Array.isArray(S.works)||!S.works.length){
+    const w=sampleWork(); S={works:[w],cur:w.id,clientId:'',rootId:'',day:null,connected:false,lastSync:0,trashFolders:[],pos:{}};
+  }
+  S.trashFolders=S.trashFolders||[]; S.pos=S.pos||{};
+}
+let saveT;
+function save(){clearTimeout(saveT);saveT=setTimeout(saveNow,400)}
+function saveNow(){clearTimeout(saveT);try{localStorage.setItem(LS,JSON.stringify(S))}catch(e){toast('端末に保存できませんでした。容量がいっぱいかもしれません')}}
+const W=()=>S.works.find(w=>w.id===S.cur)||S.works[0];
+
+/* ---------- ルビ・傍点 ---------- */
+const RE=/《《([^《》\n]+?)》》|[|｜]([^|｜《》\n]+?)《([^《》\n]+?)》|([々〆ヶ一-鿿豈-﫿]+)《([^《》\n]+?)》/g;
+function renderText(raw){
+  let out='',i=0;
+  for(const line of raw.split('\n')){
+    let h='',last=0,m;RE.lastIndex=0;
+    while((m=RE.exec(line))){
+      if(m.index>last)h+=`<span class="t" data-s="${i+last}">${esc(line.slice(last,m.index))}</span>`;
+      if(m[1]!=null)h+=`<em class="t bt" data-s="${i+m.index+2}">${esc(m[1])}</em>`;
+      else if(m[2]!=null)h+=`<ruby data-s="${i+m.index+1}">${esc(m[2])}<rt>${esc(m[3])}</rt></ruby>`;
+      else h+=`<ruby data-s="${i+m.index}">${esc(m[4])}<rt>${esc(m[5])}</rt></ruby>`;
+      last=RE.lastIndex;
+    }
+    if(last<line.length)h+=`<span class="t" data-s="${i+last}">${esc(line.slice(last))}</span>`;
+    out+=line.length?`<p data-s="${i+line.length}">${h}</p>`:`<p class="blank" data-s="${i}">​</p>`;
+    i+=line.length+1;
+  }
+  return out;
+}
+function plain(raw){return raw.replace(/《《([^《》\n]+?)》》/g,'$1').replace(/[|｜]([^|｜《》\n]+?)《[^《》\n]+?》/g,'$1').replace(/([々〆ヶ一-鿿豈-﫿]+)《[^《》\n]+?》/g,'$1')}
+const len=s=>Array.from(s).length;
+function count(raw){return len(plain(raw).replace(/\n/g,''))}
+function genkoLines(raw){return plain(raw).split('\n').reduce((a,l)=>a+Math.max(1,Math.ceil(len(l)/20)),0)}
+function caretFromPoint(x,y){
+  let node,off;
+  if(document.caretPositionFromPoint){const c=document.caretPositionFromPoint(x,y);if(!c)return null;node=c.offsetNode;off=c.offset}
+  else if(document.caretRangeFromPoint){const r=document.caretRangeFromPoint(x,y);if(!r)return null;node=r.startContainer;off=r.startOffset}
+  else return null;
+  const e=node.nodeType===3?node.parentElement:node;const tok=e&&e.closest('[data-s]');if(!tok)return null;
+  const s=+tok.dataset.s;return(tok.classList.contains('t')&&node.nodeType===3)?s+off:s;
+}
+
+/* ---------- 文字の大きさ（1行40字に合わせる） ---------- */
+let lastW=0;
+function sizeType(force){
+  if(!force&&window.innerWidth===lastW)return; lastW=window.innerWidth;
+  const avail=window.innerHeight-46-62-40;
+  const fs=Math.max(13,Math.min(20,Math.floor(avail/40)));
+  document.documentElement.style.setProperty('--fs',fs+'px');
+  if(editing)fit(editing.ta);
+}
+
+/* ---------- 巻物の描画 ---------- */
+const sc=$('#scroll');
+let editing=null,curChap=null;
+function render(){
+  const w=W();
+  $('#workBtn').textContent=w.title||'無題';
+  document.title=(w.title?w.title+' - ':'')+'巻紙';
+  sc.innerHTML='';
+  const c=el('div','cover');c.innerHTML=`<h1>${esc(w.title||'無題')}</h1><p>${w.chapters.length}章</p>`;sc.append(c);
+  w.chapters.forEach(ch=>sc.append(chapEl(ch)));
+  const a=el('button','addchap');a.type='button';a.textContent='＋ 次の章を足す';a.onclick=()=>addChapter();sc.append(a);
+  requestAnimationFrame(()=>{const p=S.pos[w.id];if(p)sc.scrollLeft=p;onScroll()});
+  updateStats();renderDrawer();
+}
+function bodyEl(ch,s){
+  const b=el('div','body');
+  b.innerHTML=ch.text?renderText(ch.text):'<p class="ph">ここをタップして書き始める</p>';
+  b.addEventListener('click',e=>openEditor(ch,s,e));
+  return b;
+}
+function chapEl(ch){
+  const s=el('section','chap');s.dataset.id=ch.id;
+  const h=el('h2');h.textContent=ch.title||'無題の章';s.append(h,bodyEl(ch,s));return s;
+}
+function fit(ta){ta.style.width='0px';ta.style.width=Math.max(ta.scrollWidth,parseFloat(getComputedStyle(ta).fontSize)*3)+'px'}
+function openEditor(ch,s,e,atEnd){
+  let pos=ch.text.length;
+  if(e&&ch.text&&!atEnd){const p=caretFromPoint(e.clientX,e.clientY);if(p!=null)pos=p}
+  const b=s.querySelector('.body');if(!b)return;
+  const ta=el('textarea','ed');ta.id='ed-'+ch.id;ta.value=ch.text;ta.spellcheck=false;ta.setAttribute('aria-label',(ch.title||'章')+'の本文');
+  b.replaceWith(ta);fit(ta);ta.focus({preventScroll:true});ta.setSelectionRange(pos,pos);
+  editing={ch,ta,s};
+  ta.addEventListener('input',()=>{ch.text=ta.value;ch.dirty=true;ch.rev++;fit(ta);save();updateStats();queueMap();scheduleSync()});
+  ta.addEventListener('blur',closeEditor);
+  setOn(ch.id);
+}
+function closeEditor(){
+  if(!editing)return;const{ch,ta,s}=editing;editing=null;
+  if(ta.isConnected)ta.replaceWith(bodyEl(ch,s));queueMap();saveNow();
+}
+function refreshEditing(ch){if(editing&&editing.ch===ch&&editing.ta.value!==ch.text){const p=editing.ta.selectionStart;editing.ta.value=ch.text;editing.ta.setSelectionRange(p,p);fit(editing.ta)}}
+function addChapter(after){
+  if(editing)editing.ta.blur();
+  const w=W();const ch=newChapter('第'+kanji(w.chapters.length+1)+'章','');
+  const i=after?w.chapters.indexOf(after)+1:w.chapters.length;w.chapters.splice(i,0,ch);
+  save();render();closeDrawer();
+  const s=sc.querySelector(`.chap[data-id="${ch.id}"]`);
+  if(s){s.scrollIntoView({inline:'center',block:'nearest'});openEditor(ch,s,null,true)}
+  scheduleSync();
+}
+
+/* ---------- 全体図・現在地 ---------- */
+let mapQ=0;const queueMap=()=>{if(!mapQ)mapQ=requestAnimationFrame(()=>{mapQ=0;drawMap()})};
+function drawMap(){
+  const map=$('#map'),total=sc.scrollWidth;if(!total)return;
+  const r=sc.getBoundingClientRect(),sl=Math.abs(sc.scrollLeft);
+  map.querySelectorAll('.seg').forEach(n=>n.remove());
+  sc.querySelectorAll('.chap').forEach((s,i)=>{
+    const b=s.getBoundingClientRect(),d=el('div','seg'+(i%2?' alt':''));
+    d.style.right=((r.right-b.right+sl)/total*100)+'%';d.style.width=(b.width/total*100)+'%';
+    d.title=s.querySelector('h2').textContent;map.insertBefore(d,$('#view'));
+  });
+  const v=$('#view');v.style.right=(sl/total*100)+'%';v.style.width=(sc.clientWidth/total*100)+'%';
+}
+function setOn(id){if(curChap===id)return;curChap=id;sc.querySelectorAll('.chap').forEach(s=>s.classList.toggle('on',s.dataset.id===id));updateStats()}
+let scT;
+function onScroll(){
+  queueMap();
+  if(!editing){const mid=sc.getBoundingClientRect().left+sc.clientWidth/2;let hit=null;
+    sc.querySelectorAll('.chap').forEach(s=>{const b=s.getBoundingClientRect();if(b.left<=mid&&b.right>=mid)hit=s});
+    if(!hit){const all=sc.querySelectorAll('.chap');if(all.length)hit=Math.abs(sc.scrollLeft)<40?all[0]:null}
+    if(hit)setOn(hit.dataset.id)}
+  clearTimeout(scT);scT=setTimeout(()=>{S.pos[W().id]=sc.scrollLeft;save()},300);
+}
+sc.addEventListener('scroll',onScroll,{passive:true});
+sc.addEventListener('wheel',e=>{if(Math.abs(e.deltaY)>Math.abs(e.deltaX)&&!e.ctrlKey){sc.scrollLeft-=e.deltaY;e.preventDefault()}},{passive:false});
+function jumpMap(e){const r=$('#map').getBoundingClientRect(),f=(r.right-e.clientX)/r.width;sc.scrollTo({left:-Math.max(0,f*sc.scrollWidth-sc.clientWidth/2),behavior:'smooth'})}
+$('#map').addEventListener('click',jumpMap);
+$('#map').addEventListener('keydown',e=>{if(e.key==='ArrowLeft')sc.scrollBy({left:-sc.clientWidth*.8,behavior:'smooth'});if(e.key==='ArrowRight')sc.scrollBy({left:sc.clientWidth*.8,behavior:'smooth'})});
+
+/* ---------- 字数 ---------- */
+function today(){const d=new Date();return d.getFullYear()+'-'+(d.getMonth()+1)+'-'+d.getDate()}
+const fmt=n=>n.toLocaleString('ja-JP');
+function updateStats(){
+  const w=W();let all=0,lines=0;w.chapters.forEach(c=>{all+=count(c.text);lines+=genkoLines(c.text)});
+  const c=w.chapters.find(x=>x.id===curChap)||w.chapters[0];
+  $('#stCur').innerHTML=c?`${esc(c.title||'無題の章')} <b>${fmt(count(c.text))}</b>字`:'';
+  $('#stAll').innerHTML=`全体 <b>${fmt(all)}</b>字・原稿用紙 <b>${(lines/20).toFixed(1)}</b>枚`;
+  const total=S.works.reduce((a,x)=>a+x.chapters.reduce((b,y)=>b+count(y.text),0),0);
+  if(!S.day||S.day.date!==today()){S.day={date:today(),start:total};save()}
+  const d=total-S.day.start;$('#stToday').innerHTML=`今日 <b>${d>=0?'+':''}${fmt(d)}</b>字`;
+  syncLabel();
+}
+
+/* ---------- 引き出し ---------- */
+function openDrawer(tab){if(editing)editing.ta.blur();if(tab)selTab(tab);renderDrawer();document.body.classList.add('open')}
+function closeDrawer(){document.body.classList.remove('open')}
+function selTab(t){$$('.tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===t)));$$('.pane').forEach(p=>p.hidden=p.dataset.pane!==t);
+  if(t==='claude'){W().draft.unread=false;save();dots()}}
+$$('.tabs button').forEach(b=>b.onclick=()=>{selTab(b.dataset.tab);renderDrawer()});
+$('#drawerBtn').onclick=()=>openDrawer();
+$('#workBtn').onclick=()=>openDrawer('work');
+$('#shade').onclick=closeDrawer;
+$('#addBtn').onclick=()=>addChapter();
+$('#addChap2').onclick=()=>addChapter();
+function confirmBtn(btn,label,fn){
+  if(btn.dataset.arm){fn();return}
+  const old=btn.textContent;btn.dataset.arm='1';btn.textContent=label;btn.classList.add('warn');
+  setTimeout(()=>{if(btn.isConnected){delete btn.dataset.arm;btn.textContent=old;btn.classList.remove('warn')}},3500);
+}
+function dots(){const u=S.works.some(w=>w.draft.unread);$('#claudeDot').hidden=!W().draft.unread;$('#drawerDot').hidden=!u}
+function renderDrawer(){
+  const w=W();
+  if(document.activeElement!==$('#wTitle'))$('#wTitle').value=w.title;
+  const rows=$('#chapRows');rows.innerHTML='';
+  w.chapters.forEach((ch,i)=>{
+    const r=el('div','row');
+    r.innerHTML=`<span class="num">${i+1}</span><input id="ct-${ch.id}" type="text" aria-label="章の名前"><button class="ib" type="button" data-a="go">移動</button><button class="ib" type="button" data-a="up" aria-label="上へ">↑</button><button class="ib" type="button" data-a="dn" aria-label="下へ">↓</button><button class="ib" type="button" data-a="del">削除</button>`;
+    const inp=r.querySelector('input');inp.value=ch.title;
+    inp.oninput=()=>{ch.title=inp.value;save();const h=sc.querySelector(`.chap[data-id="${ch.id}"] h2`);if(h)h.textContent=ch.title||'無題の章';updateStats();scheduleSync()};
+    r.querySelector('[data-a=go]').onclick=()=>{closeDrawer();const s=sc.querySelector(`.chap[data-id="${ch.id}"]`);if(s)s.scrollIntoView({inline:'start',behavior:'smooth'})};
+    r.querySelector('[data-a=up]').onclick=()=>{if(i>0){[w.chapters[i-1],w.chapters[i]]=[w.chapters[i],w.chapters[i-1]];save();render();scheduleSync()}};
+    r.querySelector('[data-a=dn]').onclick=()=>{if(i<w.chapters.length-1){[w.chapters[i+1],w.chapters[i]]=[w.chapters[i],w.chapters[i+1]];save();render();scheduleSync()}};
+    const del=r.querySelector('[data-a=del]');del.onclick=()=>confirmBtn(del,'本当に消す',()=>{if(ch.fileId)w.trash.push(ch.fileId);w.chapters.splice(i,1);save();render();scheduleSync();toast(`「${ch.title||'無題の章'}」を消しました`)});
+    rows.append(r);
+  });
+  if(!w.chapters.length)rows.innerHTML='<p class="note" style="padding:10px 0">まだ章がありません。</p>';
+  const wl=$('#workList');wl.innerHTML='';
+  S.works.forEach(x=>{const b=el('button','w');b.type='button';b.textContent=(x.title||'無題')+'　'+fmt(x.chapters.reduce((a,c)=>a+count(c.text),0))+'字';
+    b.setAttribute('aria-current',String(x.id===w.id));b.onclick=()=>{S.cur=x.id;save();render();closeDrawer()};wl.append(b)});
+  if(document.activeElement!==$('#memo'))$('#memo').value=w.memo.text;
+  const db=$('#draftBox');if(w.draft.text.trim()){db.textContent=w.draft.text;db.classList.remove('empty')}else{db.textContent=S.connected?'まだ下書きはありません。':'ドライブ同期をつなぐと、Claude からの下書きがここに届きます。';db.classList.add('empty')}
+  $('#clientId').value=S.clientId||'';
+  $('#originHint').textContent=location.origin;
+  $('#syncInfo').textContent=S.connected?(S.lastSync?'最後の同期：'+new Date(S.lastSync).toLocaleString('ja-JP'):'つながっています。'):'まだつながっていません。';
+  dots();
+}
+$('#wTitle').oninput=e=>{const w=W();w.title=e.target.value;save();$('#workBtn').textContent=w.title||'無題';const h=sc.querySelector('.cover h1');if(h)h.textContent=w.title||'無題';scheduleSync()};
+$('#memo').oninput=e=>{const m=W().memo;m.text=e.target.value;m.dirty=true;m.rev++;save();scheduleSync()};
+$('#newWork').onclick=()=>{const w=blankWork('無題の物語');w.chapters.push(newChapter('第一章',''));S.works.push(w);S.cur=w.id;save();render();openDrawer('work');$('#wTitle').focus();$('#wTitle').select();scheduleSync()};
+$('#delWork').onclick=e=>confirmBtn(e.currentTarget,'本当に消す（元に戻せません）',()=>{
+  const w=W();if(w.folderId)S.trashFolders.push(w.folderId);S.works=S.works.filter(x=>x!==w);
+  if(!S.works.length){const n=blankWork('無題の物語');n.chapters.push(newChapter('第一章',''));S.works.push(n)}
+  S.cur=S.works[0].id;save();render();scheduleSync();toast(`「${w.title||'無題'}」を消しました`)});
+$('#exportBtn').onclick=()=>{
+  const w=W();const txt=(w.title||'無題')+'\n\n'+w.chapters.map(c=>(c.title||'')+'\n\n'+c.text).join('\n\n\n');
+  const a=el('a');a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain;charset=utf-8'}));a.download=(w.title||'無題')+'.txt';document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)};
+function curChapter(){const w=W();return w.chapters.find(c=>c.id===curChap)||w.chapters[w.chapters.length-1]}
+$('#draftAppend').onclick=()=>{const w=W(),t=w.draft.text.trim();if(!t)return toast('取り込める下書きがありません');
+  let c=curChapter();if(!c){c=newChapter('第一章','');w.chapters.push(c)}
+  c.text=c.text?c.text.replace(/\n*$/,'')+'\n'+t:t;c.dirty=true;c.rev++;w.draft.unread=false;save();render();closeDrawer();scheduleSync();toast(`「${c.title}」の最後に足しました`)};
+$('#draftNew').onclick=()=>{const w=W(),t=w.draft.text.trim();if(!t)return toast('取り込める下書きがありません');
+  const c=newChapter('Claudeの下書き',t);const at=w.chapters.indexOf(curChapter())+1;w.chapters.splice(at,0,c);w.draft.unread=false;save();render();closeDrawer();scheduleSync();toast('新しい章として取り込みました')};
+$('#clientId').onchange=e=>{const v=e.target.value.trim();if(v!==S.clientId){S.clientId=v;token=null;tokenExp=0;sessionStorage.removeItem('mkgTok');save();syncLabel()}};
+$('#connectBtn').onclick=()=>{S.clientId=$('#clientId').value.trim();save();sync(true)};
+
+/* ---------- Googleドライブ同期 ---------- */
+const D='https://www.googleapis.com/drive/v3/files',U='https://www.googleapis.com/upload/drive/v3/files',F='id,name,modifiedTime,appProperties,trashed';
+let token=null,tokenExp=0,syncing=false,again=false,syncT,syncErr='';
+try{const t=JSON.parse(sessionStorage.getItem('mkgTok'));if(t&&t.exp>Date.now()){token=t.t;tokenExp=t.exp}}catch(e){}
+const hasToken=()=>token&&Date.now()<tokenExp-60000;
+function getToken(interactive){
+  return new Promise((res,rej)=>{
+    if(hasToken())return res(token);
+    if(!S.clientId)return rej(new Error('noclient'));
+    if(!interactive)return rej(new Error('needtap'));
+    if(!(window.google&&google.accounts&&google.accounts.oauth2))return rej(new Error('nogis'));
+    const c=google.accounts.oauth2.initTokenClient({client_id:S.clientId,scope:'https://www.googleapis.com/auth/drive.file',
+      callback:r=>{if(r.error)return rej(new Error(r.error));token=r.access_token;tokenExp=Date.now()+r.expires_in*1000;
+        try{sessionStorage.setItem('mkgTok',JSON.stringify({t:token,exp:tokenExp}))}catch(e){}S.connected=true;saveNow();res(token)},
+      error_callback:e=>rej(new Error(e&&e.type||'popup'))});
+    c.requestAccessToken({prompt:S.connected?'':'consent'});
+  });
+}
+async function api(url,opt={},raw){
+  const r=await fetch(url,{...opt,headers:{Authorization:'Bearer '+token,...(opt.headers||{})}});
+  if(r.status===401){token=null;tokenExp=0;sessionStorage.removeItem('mkgTok');throw new Error('expired')}
+  if(!r.ok)throw new Error('drive '+r.status+' '+(await r.text()).slice(0,160));
+  return raw?r.text():r.json();
+}
+async function list(q){let out=[],pt='';do{const j=await api(D+'?q='+encodeURIComponent(q)+'&fields='+encodeURIComponent('nextPageToken,files('+F+')')+'&pageSize=1000&spaces=drive'+(pt?'&pageToken='+pt:''));out=out.concat(j.files||[]);pt=j.nextPageToken}while(pt);return out}
+function mp(meta,text){const b='mkg'+uid();return{body:`--${b}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${b}\r\nContent-Type: text/markdown; charset=UTF-8\r\n\r\n${text}\r\n--${b}--`,headers:{'Content-Type':'multipart/related; boundary='+b}}}
+const createFile=(meta,text)=>{const m=mp({mimeType:'text/markdown',...meta},text);return api(U+'?uploadType=multipart&fields='+F,{method:'POST',...m})};
+const updateFile=(id,meta,text)=>{const m=mp(meta,text);return api(U+'/'+id+'?uploadType=multipart&fields='+F,{method:'PATCH',...m})};
+const patchMeta=(id,meta)=>api(D+'/'+id+'?fields='+F,{method:'PATCH',body:JSON.stringify(meta),headers:{'Content-Type':'application/json'}});
+const mkFolder=(name,parent,props)=>api(D+'?fields='+F,{method:'POST',body:JSON.stringify({name,mimeType:'application/vnd.google-apps.folder',...(parent?{parents:[parent]}:{}),appProperties:props}),headers:{'Content-Type':'application/json'}});
+const download=id=>api(D+'/'+id+'?alt=media',{},true);
+const safe=s=>(s||'無題の章').replace(/[\\/:*?"<>|\n]/g,'・').slice(0,60);
+const fileName=(i,t)=>String(i+1).padStart(2,'0')+'_'+safe(t)+'.md';
+const titleFrom=n=>n.replace(/^\d+_/,'').replace(/\.md$/,'');
+const README=`# 巻紙の原稿フォルダ
+
+縦書き執筆アプリ「巻紙」が使っているフォルダです。
+
+- 作品ごとにフォルダがあり、章ごとに「01_章名.md」のようなファイルが入っています（番号が章の順番）
+- 本文はふつうの文章です。ルビは ｜漢字《かんじ》、傍点は 《《言葉》》 と書きます
+- 「設定.md」は作品の設定メモです（種族・地名・出来事など）
+- 「下書き_Claude.md」は Claude が書くための場所です。頼まれた文章はこのファイルの中身を書き換えて入れてください。本文の章ファイルは直接書き換えないでください
+`;
+
+async function ensureRoot(){
+  if(S.rootId){try{const f=await api(D+'/'+S.rootId+'?fields='+F);if(!f.trashed)return}catch(e){if(e.message==='expired')throw e}}
+  const fs=await list(`mimeType='application/vnd.google-apps.folder' and appProperties has { key='kind' and value='makigamiRoot' } and trashed=false`);
+  if(fs[0]){S.rootId=fs[0].id;return}
+  S.rootId=(await mkFolder('執筆',null,{kind:'makigamiRoot'})).id;
+  await createFile({name:'巻紙について.md',parents:[S.rootId],appProperties:{kind:'makigamiReadme'}},README);
+}
+async function syncText(m,r,meta,merge){
+  if(!r){const rev=m.rev;const n=await createFile(meta,m.text||'');m.fileId=n.id;m.remoteMod=n.modifiedTime;if(m.rev===rev)m.dirty=false;return}
+  m.fileId=r.id;
+  if(r.modifiedTime!==m.remoteMod){const t=await download(r.id);
+    if(!m.dirty||t===m.text){m.text=t;m.dirty=false;m.remoteMod=r.modifiedTime}
+    else if(merge){m.text=m.text+'\n\n――― ドライブ側の内容 ―――\n'+t;m.rev++}}
+  if(m.dirty){const rev=m.rev;const{parents,...rest}=meta;const n=await updateFile(r.id,rest,m.text);m.remoteMod=n.modifiedTime;if(m.rev===rev)m.dirty=false}
+}
+async function syncWork(w,folders){
+  const title=w.title||'無題';
+  let folder=folders.find(f=>f.id===w.folderId)||folders.find(f=>(f.appProperties||{}).workId===w.id);
+  if(!folder){folder=await mkFolder(title,S.rootId,{kind:'makigamiWork',workId:w.id});
+    w.chapters.forEach(c=>{c.fileId='';c.remoteMod='';c.dirty=true});w.memo.fileId='';w.memo.dirty=true;w.draft.fileId='';w.trash=[]}
+  w.folderId=folder.id;
+  if(folder.name!==title)await patchMeta(folder.id,{name:title});
+  for(const id of w.trash.slice()){try{await patchMeta(id,{trashed:true})}catch(e){if(e.message==='expired')throw e}w.trash=w.trash.filter(x=>x!==id)}
+  const files=await list(`'${folder.id}' in parents and trashed=false`);
+  const used=new Set();
+  for(let i=0;i<w.chapters.length;i++){
+    const ch=w.chapters[i],name=fileName(i,ch.title),props={kind:'makigamiChapter',workId:w.id,chapterId:ch.id,order:String(i)};
+    const r=files.find(f=>f.id===ch.fileId)||files.find(f=>(f.appProperties||{}).chapterId===ch.id);
+    if(!r&&ch.fileId&&!ch.dirty){w.chapters.splice(i,1);i--;continue} // 別の端末で消された章
+    if(!r){const rev=ch.rev;const n=await createFile({name,parents:[folder.id],appProperties:props},ch.text);ch.fileId=n.id;ch.remoteMod=n.modifiedTime;if(ch.rev===rev)ch.dirty=false;used.add(n.id);continue}
+    used.add(r.id);ch.fileId=r.id;
+    if(r.modifiedTime!==ch.remoteMod){
+      const t=await download(r.id);
+      if(!ch.dirty||t===ch.text){ch.text=t;ch.dirty=false;ch.remoteMod=r.modifiedTime;refreshEditing(ch)}
+      else{w.chapters.splice(i+1,0,newChapter((ch.title||'無題の章')+'（ドライブ版）',t));
+        toast(`「${ch.title}」は別の端末でも直されていました。ドライブ版をすぐ後ろの章に残しています`)}
+    }
+    if(ch.dirty||r.name!==name||(r.appProperties||{}).order!==String(i)){
+      const rev=ch.rev;const n=ch.dirty?await updateFile(r.id,{name,appProperties:props},ch.text):await patchMeta(r.id,{name,appProperties:props});
+      ch.remoteMod=n.modifiedTime;if(ch.rev===rev)ch.dirty=false;
+    }
+  }
+  const extra=files.filter(f=>!used.has(f.id)&&(f.appProperties||{}).kind==='makigamiChapter'&&!w.chapters.some(c=>c.id===f.appProperties.chapterId))
+    .sort((a,b)=>(+a.appProperties.order)-(+b.appProperties.order));
+  for(const f of extra){const t=await download(f.id);
+    w.chapters.splice(Math.min(+f.appProperties.order||0,w.chapters.length),0,{id:f.appProperties.chapterId,title:titleFrom(f.name),text:t,dirty:false,rev:1,fileId:f.id,remoteMod:f.modifiedTime})}
+  const mf=files.find(f=>f.id===w.memo.fileId)||files.find(f=>(f.appProperties||{}).kind==='makigamiMemo');
+  await syncText(w.memo,mf,{name:'設定.md',parents:[folder.id],appProperties:{kind:'makigamiMemo',workId:w.id}},true);
+  const df=files.find(f=>f.id===w.draft.fileId)||files.find(f=>(f.appProperties||{}).kind==='makigamiDraft');
+  if(!df){const n=await createFile({name:'下書き_Claude.md',parents:[folder.id],appProperties:{kind:'makigamiDraft',workId:w.id}},'');w.draft.fileId=n.id;w.draft.remoteMod=n.modifiedTime}
+  else{w.draft.fileId=df.id;if(df.modifiedTime!==w.draft.remoteMod){const t=await download(df.id);w.draft.remoteMod=df.modifiedTime;
+    if(t.trim()&&t!==w.draft.text)w.draft.unread=true;w.draft.text=t}}
+}
+async function sync(interactive){
+  if(syncing){again=true;return}
+  try{await getToken(interactive)}catch(e){
+    syncErr=e.message;syncLabel();
+    if(interactive){if(e.message==='noclient'){openDrawer('sync');toast('先にクライアントIDを入れてください')}
+      else if(e.message==='nogis')toast('Google のログイン部品を読み込めませんでした。ネットにつながっているか確かめてください');
+      else toast('ドライブにつなげませんでした（'+e.message+'）')}
+    return}
+  syncing=true;syncErr='';syncLabel();
+  try{
+    await ensureRoot();
+    for(const id of S.trashFolders.slice()){try{await patchMeta(id,{trashed:true})}catch(e){if(e.message==='expired')throw e}S.trashFolders=S.trashFolders.filter(x=>x!==id)}
+    const folders=await list(`'${S.rootId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`);
+    for(const f of folders){const wid=(f.appProperties||{}).workId;if(wid&&!S.works.some(w=>w.id===wid)){const w=blankWork(f.name);w.id=wid;w.folderId=f.id;S.works.push(w)}}
+    for(const w of S.works.slice())await syncWork(w,folders);
+    S.lastSync=Date.now();saveNow();
+    if(editing){updateStats();renderDrawer()}else render();
+  }catch(e){console.error(e);syncErr=e.message==='expired'?'needtap':'fail';if(syncErr==='fail')toast('同期できませんでした。あとでもう一度ためします');saveNow()}
+  finally{syncing=false;syncLabel();if(again){again=false;scheduleSync(1500)}}
+}
+function scheduleSync(ms){clearTimeout(syncT);syncLabel();if(hasToken())syncT=setTimeout(()=>sync(false),ms||15000)}
+function syncLabel(){
+  const b=$('#syncBtn');if(!b||!S)return;
+  const dirty=S.works.some(w=>w.chapters.some(c=>c.dirty)||w.memo.dirty||w.trash.length)||S.trashFolders.length;
+  let t,c='';
+  if(syncing){t='同期中…'}
+  else if(!S.clientId){t='同期：未設定'}
+  else if(syncErr==='fail'){t='同期に失敗（タップで再試行）';c='err'}
+  else if(!hasToken()){t=dirty?'未同期あり・タップで同期':'タップで同期';c='need'}
+  else if(dirty){t='未同期の変更あり'}
+  else{t='同期済み '+(S.lastSync?new Date(S.lastSync).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}):'');c='ok'}
+  b.textContent=t;b.className=c;
+}
+$('#syncBtn').onclick=()=>{if(!S.clientId)openDrawer('sync');else sync(true)};
+document.addEventListener('visibilitychange',()=>{if(document.hidden){if(editing)ch0();saveNow();if(hasToken())sync(false)}});
+function ch0(){const c=editing.ch;c.text=editing.ta.value}
+window.addEventListener('online',()=>{if(hasToken())sync(false)});
+window.addEventListener('pagehide',saveNow);
+window.addEventListener('resize',()=>{sizeType();queueMap()});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'&&document.body.classList.contains('open'))closeDrawer();
+  if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();saveNow();if(S.clientId)sync(true);else toast('端末に保存しました')}
+});
+
+/* ---------- 小物 ---------- */
+let toastT;function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),3800)}
+
+load();sizeType(true);render();
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(()=>{queueMap();if(editing)fit(editing.ta)});
+if(hasToken())sync(false);
+if('serviceWorker' in navigator&&location.protocol==='https:')navigator.serviceWorker.register('sw.js').catch(()=>{});
+</script>
+</body>
+</html>
