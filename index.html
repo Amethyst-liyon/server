@@ -328,7 +328,7 @@ const ICON_KEYS=Object.keys(ICONS);
 const svg=k=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="${ICONS[k]||ICONS.dots}"/></svg>`;
 
 const DEF_CATS={
-  out:[["貯金マスト","coins"],["固定費","house"],["余剰","plus"],["交際費","gift"],["日用品","basket"],["娯楽費","box"],["カード代","card"],["本代","book"],["食費","bowl"],["ガソリン代","fuel"],["貯金払いまとめ","dots"],["推し活","star"],["高速代","car"],["衣服","bag"],["駐車場","car"]].map(([n,i])=>({n,i})),
+  out:[["貯金マスト","coins"],["固定費","house"],["余剰","plus"],["交際費","gift"],["日用品","basket"],["娯楽費","box"],["本代","book"],["食費","bowl"],["ガソリン代","fuel"],["貯金払いまとめ","dots"],["推し活","star"],["出張仮払い","card"]].map(([n,i])=>({n,i})),
   in:[["給料","yen"],["投資","coins"],["臨時収入","gift"],["その他","dots"]].map(([n,i])=>({n,i}))
 };
 const DICT={
@@ -767,6 +767,7 @@ $("tab-set").addEventListener("click",async e=>{
     if(!catDel||catBusy)return;const n=catDel.name;catBusy=true;
     const j=settings.cats[k].findIndex(c=>c.n===n);if(j>=0)settings.cats[k].splice(j,1);
     settings.rec=(settings.rec||[]).filter(r=>!(r.k===k&&r.c===n));
+    if(k==="out"&&settings.vb){settings.vb.a.cats=settings.vb.a.cats.filter(x=>x!==n);settings.vb.b.exclude=settings.vb.b.exclude.filter(x=>x!==n)}
     Object.keys(settings.learn||{}).forEach(w=>{if(settings.learn[w]===n)delete settings.learn[w]});
     catDel=null;renderSet();render();toast(`「${n}」を消しています…`);
     try{
@@ -795,12 +796,13 @@ render();
   try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch(e){}
   ["put","putMany","remove"].forEach(fn=>{const raw=store[fn].bind(store);store[fn]=async(k,x)=>{allMonths=null;const r=await raw(k,x);if(k.startsWith("m-")&&!(settings.months||[]).includes(k)){settings.months=[...(settings.months||[]),k].sort();saveSettings()}return r}});
   try{const st=JSON.parse(JSON.stringify(await store.settings()));settings={...settings,...st,cats:st.cats&&st.cats.out?st.cats:settings.cats,start:st.start||22,vb:st.vb&&st.vb.a&&st.vb.b?st.vb:settings.vb}}catch(e){}
+  {const names=new Set(settings.cats.out.map(c=>c.n));settings.vb.a.cats=settings.vb.a.cats.filter(x=>names.has(x));settings.vb.b.exclude=settings.vb.b.exclude.filter(x=>names.has(x))}
   if(!settings.vbMig){settings.vbMig=1;const ex=new Set(settings.vb.b.exclude);["固定費","余剰","出張仮払い"].forEach(c=>ex.add(c));settings.vb.b.exclude=[...ex];saveSettings()}
   P=periodOf(now);subscribe();
   runRecurring();
 })();
 /* ---------- 更新の確認 ---------- */
-const APP_VER="2026.10.18-6";$("appVer").textContent=APP_VER;
+const APP_VER="2026.10.18-7";$("appVer").textContent=APP_VER;
 async function checkUpdate(manual){
   try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const v=(await r.json()).v;
     if(v&&v!==APP_VER){$("upd").hidden=false}else if(manual)toast("最新の版です")}
