@@ -423,7 +423,7 @@ function makeDbStore(db,uid){const base="data/users/"+uid;let chain=Promise.reso
     return keys.map((k,i)=>snaps[i].exists?{k,items:norm((snaps[i].data()||{}).items)}:null).filter(Boolean)}}}
 
 /* ---------- 状態 ---------- */
-const DEF_VB={a:{n:"固定変動予算",amt:45000,cats:["食費","日用品","ガソリン代"]},b:{n:"娯楽変動予算",amt:45000,exclude:[]}};
+const DEF_VB={a:{n:"固定変動予算",amt:45000,cats:["食費","日用品","ガソリン代"]},b:{n:"娯楽変動予算",amt:45000,exclude:["固定費","余剰","出張仮払い"]}};
 let settings={start:22,budget:0,learn:{},cats:JSON.parse(JSON.stringify(DEF_CATS)),vb:JSON.parse(JSON.stringify(DEF_VB))};
 let kind="out",tab="home",selDay=null,docs={},unsubs=[];
 let P=periodOf(now);
@@ -795,11 +795,12 @@ render();
   try{if(navigator.storage&&navigator.storage.persist)await navigator.storage.persist()}catch(e){}
   ["put","putMany","remove"].forEach(fn=>{const raw=store[fn].bind(store);store[fn]=async(k,x)=>{allMonths=null;const r=await raw(k,x);if(k.startsWith("m-")&&!(settings.months||[]).includes(k)){settings.months=[...(settings.months||[]),k].sort();saveSettings()}return r}});
   try{const st=JSON.parse(JSON.stringify(await store.settings()));settings={...settings,...st,cats:st.cats&&st.cats.out?st.cats:settings.cats,start:st.start||22,vb:st.vb&&st.vb.a&&st.vb.b?st.vb:settings.vb}}catch(e){}
+  if(!settings.vbMig){settings.vbMig=1;const ex=new Set(settings.vb.b.exclude);["固定費","余剰","出張仮払い"].forEach(c=>ex.add(c));settings.vb.b.exclude=[...ex];saveSettings()}
   P=periodOf(now);subscribe();
   runRecurring();
 })();
 /* ---------- 更新の確認 ---------- */
-const APP_VER="2026.10.18-4";$("appVer").textContent=APP_VER;
+const APP_VER="2026.10.18-5";$("appVer").textContent=APP_VER;
 async function checkUpdate(manual){
   try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const v=(await r.json()).v;
     if(v&&v!==APP_VER){$("upd").hidden=false}else if(manual)toast("最新の版です")}
