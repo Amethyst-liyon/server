@@ -66,7 +66,7 @@ svg.ic{width:26px;height:26px;fill:none;stroke:currentColor;stroke-width:1.7;str
 .qprev b{color:var(--fg)}
 
 /* 分類タイル */
-.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
 .tile{background:var(--card);border:1.5px solid var(--line);border-radius:12px;padding:10px 4px 8px;display:grid;justify-items:center;gap:2px;text-align:center;min-width:0}
 .tile .v{font-size:16px;font-weight:700}
 .tile .n{font-size:12px;overflow-wrap:anywhere}
@@ -177,7 +177,7 @@ h2{font-size:13px;letter-spacing:.18em;margin:20px 0 4px;padding-bottom:4px;bord
 .acts .save{flex:1;padding:12px;border-radius:999px;font-weight:700;letter-spacing:.15em}
 .acts .del{padding:0 16px;border-radius:999px;border:1.5px solid var(--warn);color:var(--warn)}
 .acts .del.sure{background:var(--warn);color:var(--bg)}
-.upd{position:fixed;left:16px;right:16px;top:calc(8px + env(safe-area-inset-top,0px));max-width:528px;margin:0 auto;background:var(--fg);color:var(--bg);border-radius:12px;padding:10px 12px 10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;z-index:30;font-size:14px}
+.upd{position:fixed;left:16px;right:16px;bottom:calc(76px + env(safe-area-inset-bottom,0px));max-width:528px;margin:0 auto;background:var(--fg);color:var(--bg);border-radius:12px;padding:10px 12px 10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;z-index:30;font-size:14px}
 .upd button{background:var(--bg);color:var(--fg);border-radius:999px;padding:6px 14px;font-weight:700}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(84px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:6px 16px;border-radius:999px;font-size:13px;z-index:20;white-space:nowrap}
 @media (prefers-reduced-motion:no-preference){.gauge i{transition:width .4s ease}}
@@ -201,13 +201,6 @@ h2{font-size:13px;letter-spacing:.18em;margin:20px 0 4px;padding-bottom:4px;bord
   </header>
 
   <main id="tab-home">
-    <form class="quick" id="quick" autocomplete="off">
-      <div class="qrow">
-        <input id="q" type="text" enterkeyhint="done" placeholder="セブン おにぎり 150" aria-label="ひとこと入力">
-        <button type="submit" class="btn-solid" id="qGo" disabled>記入</button>
-      </div>
-      <div class="qprev" id="qprev"></div>
-    </form>
     <div class="tiles" id="tiles"></div>
     <div id="homeList"></div>
   </main>
@@ -450,10 +443,9 @@ function render(){
   $("tiles").innerHTML=cats.map(c=>`<button class="tile${by[c.n]?"":" zero"}" data-cat="${esc(c.n)}">${svg(c.i)}<span class="v num">${yen(by[c.n]||0)}</span><span class="n">${esc(c.n)}</span></button>`).join("");
 
   // 明細
-  $("homeList").innerHTML=`<h2><span>${kind==="out"?"支出":"収入"}の明細</span><span class="num">${list.length}件</span></h2>`+(list.length?days(list):`<div class="empty">この期間の${kind==="out"?"支出":"収入"}はまだありません。<br>上のタイルをタップするか、ひとこと入力に「セブン おにぎり 150」のように打つと記入できます。<br>前の記録があれば、設定の「CSVを取り込む」から入れられます。</div>`);
+  $("homeList").innerHTML=`<h2><span>${kind==="out"?"支出":"収入"}の明細</span><span class="num">${list.length}件</span></h2>`+(list.length?days(list):`<div class="empty">この期間の${kind==="out"?"支出":"収入"}はまだありません。<br>上のタイルをタップすると記入できます。<br>前の記録があれば、設定の「CSVを取り込む」から入れられます。</div>`);
 
   renderCal(list,s,e);
-  qPreview();
 }
 function rows(list){return list.map(x=>{const k=x.k||"out";return`<button class="row" data-edit="${x.id}">${svg(iconOf(k,x.c))}<span class="t">${esc(x.c)}${x.r?`<span class="auto">自動</span>`:""}${x.t?`<small>${esc(x.t)}</small>`:""}</span><span class="a num">${k==="in"?"+":""}${yen(x.a)}</span></button>`}).join("")}
 function days(list){
@@ -692,23 +684,6 @@ $("shDel").onclick=async()=>{
 const periodItemsAll=()=>Object.values(docs).flat();
 function jumpTo(d){const p=periodOf(new Date(d+"T12:00"));if(p.y!==P.y||p.m!==P.m){P=p;subscribe()}}
 
-/* ---------- ひとこと入力 ---------- */
-let qp=null;
-function qPreview(){
-  const v=$("q").value.trim();
-  if(!v){qp=null;$("qGo").disabled=true;$("qprev").innerHTML="「昨日」「10/1」で日付も指定できます";return}
-  qp=parse(v);qp.c=guess(qp.t,kind);qp.k=kind;const dt=new Date(qp.d+"T12:00");
-  $("qGo").disabled=!qp.a;
-  $("qprev").innerHTML=`<b>${dt.getMonth()+1}/${dt.getDate()}</b> ・ <b>${esc(qp.c)}</b>（${kind==="out"?"支出":"収入"}） ・ <b class="num">${qp.a?yen(qp.a)+"円":"金額？"}</b>`;
-}
-$("q").addEventListener("input",qPreview);
-$("quick").addEventListener("submit",async e=>{
-  e.preventDefault();if(!qp||!qp.a||!store)return;
-  const entry={id:Date.now().toString(36)+Math.random().toString(36).slice(2,6),d:qp.d,t:qp.t,a:qp.a,c:qp.c,k:qp.k,ts:Date.now()};
-  $("q").value="";qPreview();
-  try{await store.put(keyOfDate(entry.d),entry);toast(`${entry.c} ${yen(entry.a)}円 を記入`);jumpTo(entry.d)}catch(err){}
-});
-
 /* ---------- 画面の操作 ---------- */
 $("kindSeg").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;kind=b.dataset.k;render()});
 $("tiles").addEventListener("click",e=>{const b=e.target.closest("[data-cat]");if(!b)return;
@@ -778,7 +753,7 @@ render();
   runRecurring();
 })();
 /* ---------- 更新の確認 ---------- */
-const APP_VER="2026.10.18-2";$("appVer").textContent=APP_VER;
+const APP_VER="2026.10.18-3";$("appVer").textContent=APP_VER;
 async function checkUpdate(manual){
   try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const v=(await r.json()).v;
     if(v&&v!==APP_VER){$("upd").hidden=false}else if(manual)toast("最新の版です")}
