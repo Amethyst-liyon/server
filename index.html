@@ -147,6 +147,7 @@ h2{font-size:13px;letter-spacing:.18em;margin:20px 0 4px;padding-bottom:4px;bord
 .amt{display:flex;align-items:baseline;gap:6px;border-bottom:2px solid var(--line)}
 .amt input{flex:1;min-width:0;width:100%;border:0;background:none;font-family:var(--num);font-size:34px;font-weight:700;text-align:right;padding:4px 0}
 .amt span{font-size:18px}
+.negbtn{align-self:center;border:1.5px solid var(--line);border-radius:999px;width:40px;height:34px;font-size:18px;font-weight:700;flex:none}
 .chips{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
 .chip{border:1.5px solid var(--line);border-radius:10px;padding:6px 2px;display:grid;justify-items:center;font-size:11px;gap:1px;min-width:0;overflow-wrap:anywhere}
 .chip svg.ic{width:20px;height:20px}
@@ -222,7 +223,7 @@ h2{font-size:13px;letter-spacing:.18em;margin:20px 0 4px;padding-bottom:4px;bord
         <select id="recCat" aria-label="分類"></select>
         <select id="recFreq" aria-label="くり返し"><option value="m">毎月</option><option value="w">毎週</option></select>
         <select id="recDay" aria-label="日にち"></select>
-        <input id="recAmt" class="num" inputmode="numeric" placeholder="金額" aria-label="金額">
+        <input id="recAmt" class="num" inputmode="decimal" placeholder="金額" aria-label="金額">
         <input id="recMemo" placeholder="メモ（家賃など）" aria-label="メモ">
       </div>
       <button type="submit" class="btn-solid" style="padding:9px;border-radius:999px;font-weight:700">自動記録を追加</button>
@@ -251,7 +252,7 @@ h2{font-size:13px;letter-spacing:.18em;margin:20px 0 4px;padding-bottom:4px;bord
       <button type="button" data-k="out" aria-pressed="true"><span>支出</span></button>
       <button type="button" data-k="in" aria-pressed="false"><span>収入</span></button>
     </div>
-    <label class="amt"><input id="shAmt" inputmode="numeric" placeholder="0" aria-label="金額"><span>円</span></label>
+    <label class="amt"><button type="button" id="shNeg" class="negbtn" aria-label="プラスとマイナスを切り替える">±</button><input id="shAmt" inputmode="decimal" placeholder="0" aria-label="金額"><span>円</span></label>
     <div class="chips" id="shCats"></div>
     <div class="two"><input id="shDate" type="date" aria-label="日付"><input id="shMemo" type="text" placeholder="メモ（店名など）" aria-label="メモ"></div>
     <div class="acts"><button type="button" class="del" id="shDel" hidden>削除</button><button type="submit" class="save btn-solid" id="shSave">保存</button></div>
@@ -315,6 +316,10 @@ const WD="日月火水木金土";
 const now=new Date();const TODAY=ymd(now);
 let tt;function toast(t){const el=$("toast");el.textContent=t;el.hidden=false;clearTimeout(tt);tt=setTimeout(()=>el.hidden=true,1800)}
 
+/* ---------- 金額の読み取り（マイナス対応） ---------- */
+const MINUS=/[-−－ー‐―–—]/;
+function toAmt(v){const t=String(v||"").normalize("NFKC").trim();const i=t.search(/\d/);if(i<0)return 0;
+  const neg=MINUS.test(t.slice(0,i));const n=parseInt(t.slice(i).replace(/[^\d]/g,""),10)||0;return neg?-n:n}
 /* ---------- ひとこと読み取り ---------- */
 function parse(raw){
   let s=raw.normalize("NFKC").trim();
@@ -325,7 +330,7 @@ function parse(raw){
     if(md){const t=new Date(d.getFullYear(),+md[1]-1,+md[2],12);if(t>d)t.setFullYear(t.getFullYear()-1);d.setTime(t.getTime());s=s.replace(md[0]," ")}}
   s=s.replace(/(\d),(?=\d{3})/g,"$1").replace(/[¥￥]/g,"");
   const re=/(\d+(?:\.\d+)?)\s*(k|K|千|万)?\s*円?/g;let m,last=null;while((m=re.exec(s)))last=m;
-  let a=null;if(last){a=parseFloat(last[1])*(last[2]==="万"?10000:last[2]?1000:1);s=s.slice(0,last.index)+s.slice(last.index+last[0].length)}
+  let a=null;if(last){a=parseFloat(last[1])*(last[2]==="万"?10000:last[2]?1000:1);let st=last.index;const pm=s.slice(0,st).match(/(^|\s)[-−－ー‐―–—]\s*$/);if(pm){a=-a;st=pm.index+pm[1].length}s=s.slice(0,st)+s.slice(last.index+last[0].length)}
   return{d:ymd(d),a:a?Math.round(a):null,t:s.replace(/\s+/g," ").trim()};
 }
 function guess(text,k){
@@ -554,7 +559,7 @@ function renderRec(){
 $("recKind").onchange=renderRec;$("recFreq").onchange=()=>{$("recDay").value="";renderRec()};
 $("recForm").addEventListener("submit",async e=>{
   e.preventDefault();
-  const a=parseInt(($("recAmt").value||"").normalize("NFKC").replace(/[^\d]/g,""))||0;if(!a){toast("金額を入れてください");return}
+  const a=toAmt($("recAmt").value);if(!a){toast("金額を入れてください");return}
   const r={id:Date.now().toString(36),k:$("recKind").value,c:$("recCat").value,f:$("recFreq").value,day:+$("recDay").value,a,t:$("recMemo").value.trim(),from:TODAY};
   settings.rec=[...(settings.rec||[]),r];$("recAmt").value="";$("recMemo").value="";
   renderRec();toast(`${recLabel(r)}に自動記録します`);
@@ -593,12 +598,13 @@ function drawSheet(){
 }
 function closeSheet(){$("sheet").hidden=true;sh=null}
 $("shClose").onclick=closeSheet;
+$("shNeg").onclick=()=>{const el=$("shAmt");const t=el.value.trim();el.value=MINUS.test(t.charAt(0))?t.slice(1):"-"+t;};
 $("sheet").addEventListener("click",e=>{if(e.target.id==="sheet")closeSheet()});
 $("shKind").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;sh.k=b.dataset.k;if(!catOf(sh.k,sh.c))sh.c=guess($("shMemo").value,sh.k);drawSheet()});
 $("shCats").addEventListener("click",e=>{const b=e.target.closest("[data-c]");if(!b)return;sh.c=b.dataset.c;drawSheet()});
 $("shForm").addEventListener("submit",async e=>{
   e.preventDefault();if(!store)return;
-  const a=parseInt(($("shAmt").value||"").normalize("NFKC").replace(/[^\d]/g,""))||0;
+  const a=toAmt($("shAmt").value);
   if(!a){toast("金額を入れてください");$("shAmt").focus();return}
   const d=$("shDate").value||TODAY,t=$("shMemo").value.trim();
   const entry={id:sh.id||Date.now().toString(36)+Math.random().toString(36).slice(2,6),d,t,a,c:sh.c,k:sh.k,ts:sh.ts||Date.now()};
@@ -700,7 +706,7 @@ render();
   runRecurring();
 })();
 /* ---------- 更新の確認 ---------- */
-const APP_VER="2026.10.03-4";$("appVer").textContent=APP_VER;
+const APP_VER="2026.10.18-1";$("appVer").textContent=APP_VER;
 async function checkUpdate(manual){
   try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});const v=(await r.json()).v;
     if(v&&v!==APP_VER){$("upd").hidden=false}else if(manual)toast("最新の版です")}
